@@ -28,7 +28,6 @@ ext {
     pomDescription = "Common of android picker"
 }
 
-apply plugin: 'com.jakewharton.butterknife'
 dependencies {
     compile fileTree(include: ['*.jar'], dir: 'libs')
     compile files('libs/Parse-1.9.4.jar')
@@ -58,14 +57,15 @@ dependencies {
     compile 'com.commit451:PhotoView:1.2.4'//图片缩放
     compile 'com.orhanobut:logger:1.13'//打印日志
     compile 'com.github.bumptech.glide:glide:3.6.1'//显示图片框架
-    compile 'com.jakewharton:butterknife:8.5.1'
-    annotationProcessor 'com.jakewharton:butterknife-compiler:8.5.1'
+    compile 'com.jakewharton:butterknife:8.8.1'
+    annotationProcessor 'com.jakewharton:butterknife-compiler:8.8.1'
     compile 'com.github.clans:fab:1.6.4'//悬浮动画菜单
     compile 'cn.hugeterry.updatefun:updatefun:1.8.6'//fire.im自动更新
 //    compile 'com.umeng.analytics:analytics:latest.integration'//友盟统计
     compile 'com.polidea.rxandroidble2:rxandroidble:1.5.0'
     compile 'com.tbruyelle.rxpermissions2:rxpermissions:0.9.4@aar'
     compile 'com.jakewharton.rxbinding2:rxbinding-support-v4:2.0.0'
+    compile 'com.google.zxing:core:3.3.1'
 
 }
 

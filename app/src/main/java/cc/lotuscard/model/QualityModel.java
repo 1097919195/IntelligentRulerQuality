@@ -1,9 +1,11 @@
 package cc.lotuscard.model;
 
-import android.bluetooth.BluetoothGattCharacteristic;
 
 import com.jaydenxiao.common.baserx.RxSchedulers;
 
+import com.jaydenxiao.common.commonutils.ACache;
+import com.jaydenxiao.common.commonutils.LogUtils;
+import com.jaydenxiao.common.commonutils.SPUtils;
 import com.polidea.rxandroidble2.RxBleClient;
 import com.polidea.rxandroidble2.RxBleConnection;
 import com.polidea.rxandroidble2.RxBleDeviceServices;
@@ -11,41 +13,46 @@ import com.polidea.rxandroidble2.scan.ScanFilter;
 import com.polidea.rxandroidble2.scan.ScanResult;
 import com.polidea.rxandroidble2.scan.ScanSettings;
 
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+import cc.lotuscard.activity.LotusCardDemoActivity;
 import cc.lotuscard.api.Api;
 import cc.lotuscard.api.HostType;
 import cc.lotuscard.app.AppApplication;
-import cc.lotuscard.bean.QualityData;
+import cc.lotuscard.app.AppConstant;
+import cc.lotuscard.bean.HttpResponse;
+import cc.lotuscard.bean.QualityValueLength;
 import cc.lotuscard.contract.QualityContract;
 
+import cc.lotuscard.db.QualityValueLengthManager;
 import io.reactivex.Maybe;
 import io.reactivex.Observable;
+import io.reactivex.ObservableEmitter;
+import io.reactivex.ObservableOnSubscribe;
 
 
 /**
  * Created by Administrator on 2018/3/28 0028.
  */
-
 public class QualityModel implements QualityContract.Model {
     private RxBleClient rxBleClient = AppApplication.getRxBleClient(AppApplication.getAppContext());
-
     @Override
-    public Observable<QualityData> getQualityData(String id) {
-        return Api.getDefault(HostType.QUALITY_DATA)
-                .getQuality(id)
-                //如果不规范的话
-//                .map(new Func1<JSONArray, QualityData>() {
-//                    @Override
-//                    public QualityData call(JSONArray jsonArray) {
-//                        QualityData qualityData1 = new QualityData();
-//                        List<QualityData.Parts> partses = new ArrayList<QualityData.Parts>();
-//                        Gson gson = new Gson();
-//                        partses =gson.fromJson(jsonArray.toString(),new TypeToken<List<QualityData.Parts>>() {
-//                        }.getType());
-//                        qualityData1.setParts(partses);
-//                        return qualityData1;
-//                    }
-//                })
-                .compose(RxSchedulers.<QualityData>io_main());
+    public Observable<List<QualityValueLength>> getQualityData() {
+        return Observable.create(new ObservableOnSubscribe<List<QualityValueLength>>() {
+            @Override
+            public void subscribe(ObservableEmitter<List<QualityValueLength>> emitter) throws Exception {
+                ArrayList<QualityValueLength> newsChannelTableList = (ArrayList<QualityValueLength>) ACache.get(AppApplication.getAppContext()).getAsObject(AppConstant.QUALITY_DATA_LENGTH);
+                if(newsChannelTableList==null){
+                    newsChannelTableList= (ArrayList<QualityValueLength>) QualityValueLengthManager.loadNewsChannelsStatic();
+                    ACache.get(AppApplication.getAppContext()).put(AppConstant.QUALITY_DATA_LENGTH,newsChannelTableList);
+                }
+                emitter.onNext(newsChannelTableList);
+                emitter.onComplete();
+            }
+        }).compose(RxSchedulers.io_main());
     }
 
     @Override
@@ -66,6 +73,29 @@ public class QualityModel implements QualityContract.Model {
                 .flatMapSingle(RxBleConnection::discoverServices)
                 .firstElement() // Disconnect automatically after discovery
                 .compose(RxSchedulers.<RxBleDeviceServices>io_main_maybe());
+    }
+
+    @Override
+    public Observable<byte[]> startMeasure(UUID characteristicUUID) {
+        return rxBleClient.getBleDevice(AppConstant.MAC_ADDRESS)
+                .establishConnection(true)//这里要为true
+                .flatMap(rxBleConnection -> rxBleConnection.setupNotification(characteristicUUID))
+                .flatMap(notificationObservable -> notificationObservable)
+                .compose(RxSchedulers.<byte[]>io_main());
+    }
+
+    @Override
+    public Observable<RxBleConnection.RxBleConnectionState> checkBleConnectState(String mac) {
+        return rxBleClient.getBleDevice(mac)
+                .observeConnectionStateChanges()
+                .compose(RxSchedulers.io_main());
+    }
+
+    @Override
+    public Observable<HttpResponse> getUpLoadAfterChecked(String customer, String macAddress) {
+        return Api.getDefault(HostType.QUALITY_DATA)
+                .getUpLoadAfterChecked(customer,macAddress)
+                .compose(RxSchedulers.io_main());
     }
 
 }

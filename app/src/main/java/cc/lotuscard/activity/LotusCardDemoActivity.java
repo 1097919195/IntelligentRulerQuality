@@ -1,32 +1,39 @@
 package cc.lotuscard.activity;
 
 import android.Manifest;
-import android.app.PendingIntent;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattService;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.hardware.usb.UsbDevice;
-import android.hardware.usb.UsbDeviceConnection;
-import android.hardware.usb.UsbInterface;
-import android.hardware.usb.UsbManager;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.support.annotation.NonNull;
+import android.support.v7.widget.StaggeredGridLayoutManager;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import com.afollestad.materialdialogs.DialogAction;
 import com.afollestad.materialdialogs.MaterialDialog;
+import com.aspsine.irecyclerview.IRecyclerView;
 import com.aspsine.irecyclerview.universaladapter.ViewHolderHelper;
 import com.aspsine.irecyclerview.universaladapter.recyclerview.CommonRecycleViewAdapter;
+import com.aspsine.irecyclerview.universaladapter.recyclerview.OnItemClickListener;
+import com.jakewharton.rxbinding2.view.RxView;
+import com.jakewharton.rxbinding2.widget.RxTextView;
 import com.jaydenxiao.common.base.BaseActivity;
-import com.jaydenxiao.common.baserx.RxBus;
 import com.jaydenxiao.common.baserx.RxBus2;
+import com.jaydenxiao.common.baserx.RxSchedulers;
+import com.jaydenxiao.common.baserx.RxSubscriber;
+import com.jaydenxiao.common.commonutils.ImageLoaderUtils;
 import com.jaydenxiao.common.commonutils.LogUtils;
 import com.jaydenxiao.common.commonutils.SPUtils;
 import com.jaydenxiao.common.commonutils.ToastUtil;
@@ -37,89 +44,77 @@ import com.polidea.rxandroidble2.RxBleDeviceServices;
 import com.polidea.rxandroidble2.scan.ScanResult;
 import com.tbruyelle.rxpermissions2.RxPermissions;
 
-import java.text.SimpleDateFormat;
+
+import org.w3c.dom.Text;
+
 import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
-import cc.lotuscard.LotusCardDriver;
-import cc.lotuscard.LotusCardParam;
+import butterknife.BindView;
 import cc.lotuscard.app.AppApplication;
 import cc.lotuscard.app.AppConstant;
 import cc.lotuscard.bean.BleDevice;
+import cc.lotuscard.bean.HttpResponse;
+import cc.lotuscard.bean.QualityBleData;
 import cc.lotuscard.bean.QualityData;
+import cc.lotuscard.bean.QualityValueLength;
 import cc.lotuscard.contract.QualityContract;
-import cc.lotuscard.identificationcardtest.R;
+import cc.lotuscard.rulerQuality.R;
 import cc.lotuscard.model.QualityModel;
 import cc.lotuscard.presenter.QualityPresenter;
-import cc.lotuscard.broadcast.UsbListenerBroadcast;
+import cc.lotuscard.broadcast.StartingUpBroadcast;
+import io.reactivex.Observable;
 import io.reactivex.functions.Consumer;
 
 
-public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,QualityModel> implements QualityContract.View {
-
-    private LotusCardDriver mLotusCardDriver;
-    private UsbManager usbManager = null;
-    private UsbDevice usbDevice = null;
-    private UsbInterface usbInterface = null;
-    private UsbDeviceConnection usbDeviceConnection = null;
-    private final int m_nVID = 1306;//供应商ID
-    private final int m_nPID = 20763;//产品识别码
-    private static final String ACTION_USB_PERMISSION = "com.android.example.USB_PERMISSION";
-
-    private Boolean haveUsbHostApi = false;
-    private String deviceNode;//USB设备名称
-    private HashMap<String, UsbDevice> deviceList;
-
-    private int deviceHandle = -1;
-    private Handler mHandler = null;
-    private CardOperateThread cardOperateThread;
-    private LotusCardParam tLotusCardParam1 = new LotusCardParam();
+public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,QualityModel> implements QualityContract.View{
 
     /*********************************** BLE *********************************/
-    private RxBleClient rxBleClient;
     private List<BleDevice> bleDeviceList = new ArrayList<>();
     private CommonRecycleViewAdapter<BleDevice> bleDeviceAdapter;
     private MaterialDialog scanResultDialog,cirProgressBarWithScan,cirProgressBarWithChoose;
     private List<String> rxBleDeviceAddressList = new ArrayList<>();
 
     /*********************************** UI *********************************/
-    private TextView m_tvDeviceNode;
+    private StartingUpBroadcast startingUpBroadcast;
+    @BindView(R.id.bleState)
+    ImageView bleState;
+    @BindView(R.id.bleMacAddress)
+    TextView bleMacAddress;
+    @BindView(R.id.bleBattery)
+    TextView bleBattery;
+    @BindView(R.id.customer)
+    EditText customer;
+    @BindView(R.id.irc_quality_data)
+    IRecyclerView irc;
+    private CommonRecycleViewAdapter<QualityBleData> adapter;
+    List<QualityBleData> qualityBleDataList = new ArrayList<>();
 
-    private TextView displayCard;
-    private EditText displayCode;
-    private Boolean flag = false;
-    private UsbListenerBroadcast usbListenerBroadcast;
-    private ImageView bleState;
+    List<QualityValueLength> qualityValueLengths = new ArrayList<>();
+    int unMeasuredCounts=0;
+    int measuredCounts=0;
+    int itemPostion = 0;
+    int itemPostionAgo = 0;
+    boolean remuasure = false;
+    List<Integer> canRemeasureData = new ArrayList<>();
+    List<Integer> unqualifiedData = new ArrayList<>();
 
     @Override
     protected void onResume() {
         super.onResume();
-        flag = true;
 
-        initBleState();
         configureBleList();
-        bleState.setOnClickListener(v ->  {
-            String macAddress = SPUtils.getSharedStringData(AppApplication.getAppContext(),AppConstant.MAC_ADDRESS);
-            if (TextUtils.isEmpty(macAddress)) {
-                scanAndConnectBle();
-            }else {
-                new MaterialDialog.Builder(this)
-                        .title("已绑定智能尺: " + macAddress + "，需要连接新智能尺？")
-                        .titleColor(getResources().getColor(R.color.ff5001))
-                        .positiveText(R.string.sure)
-                        .negativeText(R.string.cancel)
-                        .backgroundColor(getResources().getColor(R.color.white))
-                        .onPositive((dialog, which) -> {
-                            scanAndConnectBle();
-                        })
-                        .show();
-            }
-        });
+        initBleStateListener();
+    }
 
+    private void initBleStateListener() {
+        bleState.setOnClickListener(v ->  {
+                scanAndConnectBle();
+        });
     }
 
     private void configureBleList() {
@@ -206,23 +201,9 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
                         } else if (permission.shouldShowRequestPermissionRationale) {
                             // Denied permission without ask never again
                         } else {
-                            // Denied permission with ask never again
-                            // Need to go to the settings
                             ToastUtil.showShort(getString(R.string.unauthorized_location));
                         }
                     });
-        }
-    }
-
-    //蓝牙初始化
-    private void initBleState() {
-        String macAddress = SPUtils.getSharedStringData(AppApplication.getAppContext(),AppConstant.MAC_ADDRESS);
-        if (!TextUtils.isEmpty(macAddress)) {
-            bleState.setBackgroundResource(R.drawable.ble_connected);
-//            RxBleDevice rxBleDevice = rxBleClient.getBleDevice(macAddress);
-//            if (rxBleDevice != null && rxBleDevice.getConnectionState() == RxBleConnection.RxBleConnectionState.CONNECTED) {
-//                bleState.setBackgroundResource(R.drawable.ble_connected);
-//            }
         }
     }
 
@@ -239,57 +220,149 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
     @Override
     public void initView() {
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);// 设置全屏
-        UsbListenerState();
-//        mLotusCardDriver = new LotusCardDriver();
-        m_tvDeviceNode = (TextView) findViewById(R.id.tvDeviceNode);
-        displayCard = (TextView) findViewById(R.id.displayCard);
-        displayCode = (EditText) findViewById(R.id.displayCode);
-        bleState = (ImageView) findViewById(R.id.bleState);
-        // 设置USB读写回调 串口可以不用此操作
-//        haveUsbHostApi = SetUsbCallBack();
-//        //测卡器设备检测
-//        cardDeviceChecked();
+        StartingUpBroadcastRecive();
 
-        mHandler = new Handler() {
-            @Override
-            public void handleMessage(Message msg) {
-                super.handleMessage(msg);
-                if (msg.what==1) {
-                    if (flag) {
-                        SimpleDateFormat formatter = new SimpleDateFormat("HH:mm:ss");
-                        Date curDate = new Date(System.currentTimeMillis());// 获取当前时间
-                        String strDate = formatter.format(curDate);
-                        displayCard.setText(strDate + "====" + msg.obj.toString());
-                        mPresenter.getQualityDataRequest(msg.obj.toString());
+        initRcycleAdapter();
+        itemClickRemeasure();
+        initRxBus2FindBle();
+        initListener();
+        initSearchAdapter();
+    }
+
+    private void initSearchAdapter() {
+        
+    }
+
+    private void initListener() {
+        RxTextView.textChanges(customer)
+                .debounce( 700 , TimeUnit.MILLISECONDS )
+                .subscribe(new Consumer<Object>() {
+                    @Override
+                    public void accept(Object o) throws Exception {
+                        if (customer.getEditableText().length() > 0) {
+                            // FIXME: 2018/5/8 0008 
+                            mPresenter.getUpLoadAfterCheckedRequest(customer.getEditableText().toString().trim(),AppConstant.MAC_ADDRESS);
+                        }
                     }
-                }
-                if (msg.what == 2) {
+                });
+    }
 
-                }
-
-            }
-        };
-
-        Timer timer = new Timer();
-        TimerTask timerTask = new TimerTask() {
+    private void itemClickRemeasure() {
+        adapter.setOnItemClickListener(new OnItemClickListener() {
             @Override
-            public void run() {
-//                Message msg = new Message();
-//                msg.obj = i;
-//                msg.what = 2;
-//                mHandler.sendMessage(msg);
+            public void onItemClick(ViewGroup parent, View view, Object o, int position) {
+                if (canRemeasureData.size() > position) {
+                    itemPostion = position;
+                    remuasure = true;
+                    qualityBleDataList.get(itemPostionAgo).setSelected(false);
+                    if (unMeasuredCounts != 0) {
+                        qualityBleDataList.get(measuredCounts-unMeasuredCounts).setSelected(false);
+                    }
+                    qualityBleDataList.get(itemPostion).setSelected(true);
+                    adapter.notifyDataSetChanged();
+                    itemPostionAgo = itemPostion;
+                }else {
+                    ToastUtil.showShort("请先按顺序完成第一次测量");
+                }
 
-                //先后顺序不可变
-                KeepUsbDeviceState();
-                CheckUsbDeviceState();
+                // FIXME: 2018/5/7 0007
+//                View viewHolder = irc.getChildAt(position);
+//                LogUtils.loge(viewHolder.toString());
+//                if (null != irc.getChildViewHolder(viewHolder)){
+//                    ViewHolderHelper viewHolderHelper = (ViewHolderHelper) irc.getChildViewHolder(viewHolder);
+//                    viewHolderHelper.setBackgroundColor(R.id.ll_container, getResources().getColor(R.color.red));
+//                    adapter.notifyDataSetChanged();
+//                }
+            }
 
+            @Override
+            public boolean onItemLongClick(ViewGroup parent, View view, Object o, int position) {
+                return false;
+            }
+        });
+    }
+
+    private void initRcycleAdapter() {
+        mPresenter.getQualityDataRequest();
+        adapter = new CommonRecycleViewAdapter<QualityBleData>(this, R.layout.item_quality, qualityBleDataList) {
+            @Override
+            public void convert(ViewHolderHelper helper, QualityBleData qualityBleData) {
+                TextView valueLength = helper.getView(R.id.valueLength);
+                TextView actValue = helper.getView(R.id.actValue);
+                TextView actAngle = helper.getView(R.id.actAngle);
+
+                valueLength.setText(qualityBleData.getValueLength());
+                actValue.setText(String.valueOf(qualityBleData.getActValue()));
+                actAngle.setText(String.valueOf(qualityBleData.getActAngle()));
+
+                if (qualityBleData.isUnqualified()) {
+                    //不及格的
+                    actValue.setTextColor(getResources().getColor(R.color.battery_color));
+                }else {
+                    actValue.setTextColor(getResources().getColor(R.color.black));
+                }
+
+                if (qualityBleData.isSelected()) {
+                    //选中的样式
+                    helper.setBackgroundColor(R.id.valueLength, getResources().getColor(R.color.item_selector));
+                    helper.setBackgroundColor(R.id.actValue, getResources().getColor(R.color.item_selector));
+                    helper.setBackgroundColor(R.id.actAngle, getResources().getColor(R.color.item_selector));
+                } else {
+                    //未选中的样式
+                    helper.setBackgroundColor(R.id.valueLength,getResources().getColor(R.color.white));
+                    helper.setBackgroundColor(R.id.actValue,getResources().getColor(R.color.white));
+                    helper.setBackgroundColor(R.id.actAngle,getResources().getColor(R.color.white));
+                }
+
+                if (qualityBleData.getActValue() == 0) {
+                    actValue.setTextColor(getResources().getColor(R.color.black));
+                }
             }
         };
-//        timer.schedule(timerTask,6000,10000);
+        View view = View.inflate(this, R.layout.list_bottom_button, null);
+        view.findViewById(R.id.btnClear).setOnClickListener(v -> {
+            new MaterialDialog.Builder(this)
+                    .title("确定清除所有数据吗")
+                    .onPositive(new MaterialDialog.SingleButtonCallback() {
+                        @Override
+                        public void onClick(@NonNull MaterialDialog dialog, @NonNull DialogAction which) {
+                            qualityBleDataList.clear();
+                            for (int i=0;i<qualityValueLengths.size();i++) {
+                                qualityBleDataList.add(new QualityBleData());
+                                qualityBleDataList.get(i).setValueLength(qualityValueLengths.get(i).getValueLength());
+                            }
+                            unMeasuredCounts = qualityValueLengths.size();
+                            measuredCounts = qualityValueLengths.size();
+                            qualityBleDataList.get(0).setSelected(true);
+                            adapter.notifyDataSetChanged();
+                            customer.setText("");
+                        }
+                    })
+                    .positiveText(getResources().getString(R.string.sure))
+                    .negativeColor(getResources().getColor(R.color.ff0000))
+                    .negativeText("点错了")
+                    .show();
 
+        });
+        view.findViewById(R.id.btnSave).setOnClickListener(v -> {
+            if (customer.getEditableText().toString().trim().length()>=1) {
+                if (unMeasuredCounts == 0 && AppConstant.MAC_ADDRESS!="") {
+                    mPresenter.getUpLoadAfterCheckedRequest(customer.getEditableText().toString().trim(),AppConstant.MAC_ADDRESS);
+                }else {
+                    ToastUtil.showShort("请先测量完毕！");
+                }
+            }else {
+                ToastUtil.showShort("您还没有填写对应的客户呐！");
+            }
 
-        rxBleClient = AppApplication.getRxBleClient(this);
+        });
+        irc.addFooterView(view);
 
+        irc.setAdapter(adapter);
+        irc.setLayoutManager(new StaggeredGridLayoutManager(1,StaggeredGridLayoutManager.VERTICAL));
+    }
+
+    private void initRxBus2FindBle() {
         //监听是否发现附近蓝牙
         mRxManager.on(AppConstant.NO_BLE_FIND, new Consumer<Boolean>() {
             @Override
@@ -299,257 +372,27 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
                 }
             }
         });
-
     }
 
-    // FIXME: 2018/4/2 0002 添加USB插拔状态监听
-    //设置USB读写回调
-    private Boolean SetUsbCallBack() {
-        Boolean bResult = false;
-        PendingIntent pendingIntent;
-        pendingIntent = PendingIntent.getBroadcast(this, 0, new Intent(
-                ACTION_USB_PERMISSION), 0);
-        // Get UsbManager from Android.
-        usbManager = (UsbManager) getSystemService(USB_SERVICE);
-        if (null == usbManager)
-            return bResult;
-
-        //获取设备及设备名字
-        deviceList = usbManager.getDeviceList();
-        if (!deviceList.isEmpty()) {
-            for (UsbDevice device : deviceList.values()) {
-                if ((m_nVID == device.getVendorId())
-                        && (m_nPID == device.getProductId())) {
-                    usbDevice = device;
-                    deviceNode = usbDevice.getDeviceName();
-                    break;
-                }
-            }
-        }
-        if (null == usbDevice)
-            return bResult;
-        usbInterface = usbDevice.getInterface(0);
-        if (null == usbInterface)
-            return bResult;
-        if (false == usbManager.hasPermission(usbDevice)) {//权限判断
-            usbManager.requestPermission(usbDevice, pendingIntent);
-        }
-        UsbDeviceConnection conn = null;//这个类用于发送和接收数据和控制消息到USB设备
-        if (usbManager.hasPermission(usbDevice)) {
-            conn = usbManager.openDevice(usbDevice);//获取实例
-        }
-
-        if (null == conn)
-            return bResult;
-
-        if (conn.claimInterface(usbInterface, true)) {
-            usbDeviceConnection = conn;
-        } else {
-            conn.close();
-        }
-        if (null == usbDeviceConnection)
-            return bResult;
-        // 把上面获取的对性设置到接口中用于回调操作
-        LotusCardDriver.m_UsbDeviceConnection = usbDeviceConnection;
-        if (usbInterface.getEndpoint(1) != null) {
-            LotusCardDriver.m_OutEndpoint = usbInterface.getEndpoint(1);
-        }
-        if (usbInterface.getEndpoint(0) != null) {
-            LotusCardDriver.m_InEndpoint = usbInterface.getEndpoint(0);
-        }
-        bResult = true;
-        return bResult;
-    }
-
-    //刷卡器USB检测
-    private void cardDeviceChecked() {
-        if (haveUsbHostApi) {
-            m_tvDeviceNode.post(new Runnable() {
-                @Override
-                public void run() {
-                    m_tvDeviceNode.setText("Device Node:" + deviceNode);
-                }
-            });
-            initAuto();
-        }else {
-            m_tvDeviceNode.post(new Runnable() {
-                @Override
-                public void run() {
-                    m_tvDeviceNode.setText("Device Node:" + "未检测到设备!");
-                }
-            });
-        }
-    }
-
-    //自动检测USB设备初始化
-    public void initAuto() {
-        if (-1 == deviceHandle) {
-            deviceHandle = mLotusCardDriver.OpenDevice("", 0, 0, true);
-        }
-        if (deviceHandle != -1) {
-            cardOperateThread = new CardOperateThread();
-            new Thread(cardOperateThread).start();
-        }
-    }
-
-    //实时观察设备状态
-    public void CheckUsbDeviceState() {
-        if (haveUsbHostApi) {
-            m_tvDeviceNode.post(new Runnable() {
-                @Override
-                public void run() {
-                    m_tvDeviceNode.setText("Device Node:" + deviceNode);
-                }
-            });
-        }else {
-            m_tvDeviceNode.post(new Runnable() {
-                @Override
-                public void run() {
-                    m_tvDeviceNode.setText("Device Node:" + "未检测到设备!");
-                }
-            });
-        }
-    }
-
-    //保持设备连接
-    public void KeepUsbDeviceState() {
-        if (haveUsbHostApi) {
-            //有设备
-            haveUsbHostApi = false;
-            mLotusCardDriver.CloseDevice(deviceHandle);
-            usbDevice = null;
-//            ToastUtil.showShort("无设备连接");
-        }else{
-            //无设备
-            usbManager = (UsbManager) getSystemService(USB_SERVICE);
-
-            //获取设备及设备名字
-            deviceList = usbManager.getDeviceList();
-            if (!deviceList.isEmpty()) {
-                for (UsbDevice device : deviceList.values()) {
-                    if ((m_nVID == device.getVendorId())
-                            && (m_nPID == device.getProductId())) {
-                        usbDevice = device;
-                        deviceNode = usbDevice.getDeviceName();
-                        break;
-                    }
-                }
-            }
-            if (null == usbDevice)
-                return;
-            usbInterface = usbDevice.getInterface(0);
-            UsbDeviceConnection conn = null;//这个类用于发送和接收数据和控制消息到USB设备
-            if (usbManager.hasPermission(usbDevice)) {
-                conn = usbManager.openDevice(usbDevice);//获取实例
-            }
-
-            if (conn.claimInterface(usbInterface, true)) {
-                usbDeviceConnection = conn;
-            } else {
-                conn.close();
-            }
-            // 把上面获取的对性设置到接口中用于回调操作
-            LotusCardDriver.m_UsbDeviceConnection = usbDeviceConnection;
-            if (usbInterface.getEndpoint(1) != null) {
-                LotusCardDriver.m_OutEndpoint = usbInterface.getEndpoint(1);
-            }
-            if (usbInterface.getEndpoint(0) != null) {
-                LotusCardDriver.m_InEndpoint = usbInterface.getEndpoint(0);
-            }
-
-            if (deviceHandle == -1) {
-                initAuto();
-            }else {
-                deviceHandle = mLotusCardDriver.OpenDevice("", 0, 0, true);
-            }
-            haveUsbHostApi = true;
-        }
-
-    }
-
-    //清除按钮
-    public void OnClearLogListener(View arg0) {
-        mPresenter.getQualityDataRequest("159");
-        if (null == displayCard)
-            return;
-        displayCard.setText("");
-        if (null == displayCode)
-            return;
-        displayCode.setText("");
-
-        if (haveUsbHostApi) {
-            //有设备
-            haveUsbHostApi = false;
-            mLotusCardDriver.CloseDevice(deviceHandle);
-            usbDevice = null;
-            ToastUtil.showShort("无设备连接");
-        }else{
-            //无设备
-            usbManager = (UsbManager) getSystemService(USB_SERVICE);
-
-            //获取设备及设备名字
-            deviceList = usbManager.getDeviceList();
-            if (!deviceList.isEmpty()) {
-                for (UsbDevice device : deviceList.values()) {
-                    if ((m_nVID == device.getVendorId())
-                            && (m_nPID == device.getProductId())) {
-                        usbDevice = device;
-                        deviceNode = usbDevice.getDeviceName();
-                        break;
-                    }
-                }
-            }
-            if (null == usbDevice)
-                return;
-            usbInterface = usbDevice.getInterface(0);
-            UsbDeviceConnection conn = null;//这个类用于发送和接收数据和控制消息到USB设备
-            if (usbManager.hasPermission(usbDevice)) {
-                conn = usbManager.openDevice(usbDevice);//获取实例
-            }
-
-            if (conn.claimInterface(usbInterface, true)) {
-                usbDeviceConnection = conn;
-            } else {
-                conn.close();
-            }
-            // 把上面获取的对性设置到接口中用于回调操作
-            LotusCardDriver.m_UsbDeviceConnection = usbDeviceConnection;
-            if (usbInterface.getEndpoint(1) != null) {
-                LotusCardDriver.m_OutEndpoint = usbInterface.getEndpoint(1);
-            }
-            if (usbInterface.getEndpoint(0) != null) {
-                LotusCardDriver.m_InEndpoint = usbInterface.getEndpoint(0);
-            }
-
-            if (deviceHandle == -1) {
-                    initAuto();
-            }else {
-                    deviceHandle = mLotusCardDriver.OpenDevice("", 0, 0, true);
-            }
-            haveUsbHostApi = true;
-        }
-
-    }
-
-    public void UsbListenerState() {
+    public void StartingUpBroadcastRecive() {
         IntentFilter intentFilter = new IntentFilter();
-        intentFilter.addAction("android.hardware.usb.action.USB_STATE");
-        usbListenerBroadcast = new UsbListenerBroadcast();
-        registerReceiver(usbListenerBroadcast, intentFilter);
+        intentFilter.addAction("android.intent.action.BOOT_COMPLETED");
+        startingUpBroadcast = new StartingUpBroadcast();
+        registerReceiver(startingUpBroadcast, intentFilter);
     }
 
-    //需要质检的数据
+    //获取需要测试的长度
     @Override
-    public void returnGetQualityData(QualityData qualityData) {
-        if (qualityData != null) {
-            ArrayList<QualityData.Parts> mlist = qualityData.getParts();
-
-            if (mlist.size() > 0) {
-//                startQualityControl(mlist);
-                CheckActivity.startActivity(mContext, mlist);
-            } else {
-                ToastUtil.showShort("无对应的数据!");
+    public void returnGetQualityData(List<QualityValueLength> qualityValueLength) {
+        if (qualityValueLength != null) {
+            qualityValueLengths = qualityValueLength;
+            for (int i=0;i<qualityValueLength.size();i++) {
+                qualityBleDataList.add(new QualityBleData());
+                qualityBleDataList.get(i).setValueLength(qualityValueLength.get(i).getValueLength());
             }
+            unMeasuredCounts = qualityValueLength.size();
+            measuredCounts = qualityValueLength.size();
+            qualityBleDataList.get(0).setSelected(true);
         }
     }
 
@@ -571,119 +414,129 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
         }
     }
 
+    //获取到UUID并且建立通信
     @Override
     public void returnChooseDeviceConnectWithSetUuid(RxBleDeviceServices deviceServices) {
-        bleState.setImageResource(R.drawable.ble_connected);
         for (BluetoothGattService service : deviceServices.getBluetoothGattServices()) {
             for (BluetoothGattCharacteristic characteristic : service.getCharacteristics()) {
                 if (isCharacteristicNotifiable(characteristic)) {
-//                    AppApplication.setUUID(this, characteristic.getUuid());
-                    SPUtils.setSharedStringData(AppApplication.getAppContext(), AppConstant.UUID,characteristic.getUuid().toString());
+                    AppConstant.UUID_STRING = characteristic.getUuid().toString();
+                    ToastUtil.showShort("蓝牙配对成功，等待建立通信中...");
                     cirProgressBarWithChoose.dismiss();
-                    ToastUtil.showShort("蓝牙配对成功");
+                    mPresenter.startMeasureRequest(characteristic.getUuid());
+                    if (AppConstant.MAC_ADDRESS!="") {
+                        mPresenter.checkBleConnectStateRequest(AppConstant.MAC_ADDRESS);
+                    }
                     break;
                 }
             }
         }
     }
-
     private boolean isCharacteristicNotifiable(BluetoothGattCharacteristic characteristic) {
         return (characteristic.getProperties() & BluetoothGattCharacteristic.PROPERTY_NOTIFY) != 0;
     }
 
     @Override
     public void returnChooseDeviceConnectWithSetAddress(String mac) {
-//        AppApplication.setMacAddress(this, mac);
-        SPUtils.setSharedStringData(AppApplication.getAppContext(), AppConstant.MAC_ADDRESS,mac);
+        AppConstant.MAC_ADDRESS = mac;
     }
 
-    // FIXME: 2018/4/4 0004
-    //对应蓝牙是否还能被检测
-    private void equipmentDie(ScanResult scanResult) {
-    }
+    //测量内容
+    @Override
+    public void returnStartMeasure(Float length, Float angle, int battery) {
+        bleBattery.setText(battery + "%");
 
-//    private void startQualityControl(List<QualityData.Parts> mlist) {
-//        String name;
-//        int value = 0;
-//        List<String> gravity = new ArrayList<>();
-//        List<Integer> unit = new ArrayList<>();
-//        for (QualityData.Parts p : mlist) {
-//            gravity.add(p.getName());
-//        }
-//        Log.e("TAG2", gravity.toString());
-//        for (int i=0;i<mlist.size();i++) {
-//            name = gravity.get(i);
-//            Log.e("TAG3", name);
-//        }
-//
-//        for (QualityData.Parts p : mlist) {
-//            unit.add(p.getValue());
-//        }
-//        Log.e("TAG2", unit.toString());
-//        for (int i=0;i<mlist.size();i++) {
-//            value = unit.get(i);
-//            Log.e("TAG3", String.valueOf(value));
-//        }
-//
-//
-//        int grivatyCount = gravity.size();//获取数组的个数 等于集合的个数
-//        String[] grivatyValue = gravity.toArray(new String[grivatyCount]);//把集合转化成数组
-//
-////        CheckActivity.startActivity(mContext,grivatyValue,value);
-//    }
+        if (remuasure) {
+            qualityBleDataList.get(itemPostion).setActValue(length);
+            qualityBleDataList.get(itemPostion).setActAngle(angle);
+            qualityBleDataList.get(itemPostion).setSelected(false);
 
-    //子线程
-    public class CardOperateThread implements Runnable {
-        @Override
-        public void run() {
-            boolean bResult;
-            int nRequestType;
-            long lCardNo;
-            int n=0;
-
-            while (true) {//使得线程循环
-                if (haveUsbHostApi && flag) {//是否暂停
-                    // FIXME: 2018/4/1 0001 线程运行速度变慢了好多
-                    Log.e("test===",String.valueOf(n++));
-                    try {
-                        nRequestType = LotusCardDriver.RT_NOT_HALT;//未进入休眠的卡
-                        bResult = mLotusCardDriver.GetCardNo(deviceHandle, nRequestType, tLotusCardParam1);//获取卡号，true表示成功
-
-                        //如果失败了则sleep跳出,再循环
-                        if (!bResult) {
-                            Thread.sleep(500);
-                            continue;
-                        }
-
-                        Message msg = new Message();
-                        lCardNo = bytes2long(tLotusCardParam1.arrCardNo);
-                        msg.obj = lCardNo;
-                        msg.what = 1;
-                        mHandler.sendMessage(msg);
-
-                        mLotusCardDriver.Beep(deviceHandle, 10);//响铃
-                        mLotusCardDriver.Halt(deviceHandle);//响铃关闭
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                }
-
-            }
-        }
-    }
-
-    //获取到的卡号是4个字节的需转换
-    public long bytes2long(byte[] byteNum) {
-        long num = 0;
-        for (int ix = 3; ix >= 0; --ix) {
-            num <<= 8;
-            if (byteNum[ix] < 0) {
-                num |= (256 + (byteNum[ix]) & 0xff);
+            if (unMeasuredCounts != 0) {
+                qualityBleDataList.get(measuredCounts - unMeasuredCounts).setSelected(true);
+                remuasure = false;
             } else {
-                num |= (byteNum[ix] & 0xff);
+                remuasure = false;
+            }
+            adapter.notifyDataSetChanged();
+        } else {
+            if (unMeasuredCounts != 0) {
+                assignValue(length, angle);
+            } else {
+                ToastUtil.showShort(getString(R.string.measure_completed));
             }
         }
-        return num;
+
+        //对应不达标的显示状态
+        unqualifiedData.clear();
+        for (int i = 0; i < qualityBleDataList.size(); i++) {
+            if (qualityBleDataList.get(i).getActValue() - Float.valueOf(qualityBleDataList.get(i).getValueLength()) > 0.3 || qualityBleDataList.get(i).getActValue() - Float.valueOf(qualityBleDataList.get(i).getValueLength()) < -0.3) {
+                unqualifiedData.add(i);
+            }else {
+                qualityBleDataList.get(i).setUnqualified(false);
+            }
+        }
+
+        for (Integer i:unqualifiedData) {
+            qualityBleDataList.get(i).setUnqualified(true);
+            adapter.notifyDataSetChanged();
+        }
+    }
+
+    private void assignValue(Float length, Float angle) {
+        try {
+            if (unMeasuredCounts != 1) {//这个操作只有蓝牙按下后才会触发，所以unMeasuredCounts不能为1
+                qualityBleDataList.get(measuredCounts+1-unMeasuredCounts).setSelected(true);
+            }
+            qualityBleDataList.get(measuredCounts-unMeasuredCounts).setSelected(false);
+            qualityBleDataList.get(measuredCounts - unMeasuredCounts).setActValue(length);
+            qualityBleDataList.get(measuredCounts - unMeasuredCounts).setActAngle(angle);
+            canRemeasureData.add(measuredCounts-unMeasuredCounts);
+            if (unMeasuredCounts != 0) {
+                unMeasuredCounts = unMeasuredCounts - 1;
+            }
+            adapter.notifyDataSetChanged();
+        } catch (Exception e) {
+
+        }
+
+    }
+
+    //监听蓝牙状态
+    @Override
+    public void returnCheckBleConnectState(RxBleConnection.RxBleConnectionState connectionState,String mac) {
+        RxBleClient rxBleClient = AppApplication.getRxBleClient(this);
+
+        RxBleDevice rxBleDevice = rxBleClient.getBleDevice(mac);
+        RxBleConnection.RxBleConnectionState bleStatus = rxBleDevice.getConnectionState();
+        if (bleStatus == connectionState.DISCONNECTED) {
+            bleState.setImageResource(R.drawable.ble_disconnected);
+            bleMacAddress.setText("");
+            bleBattery.setText("");
+        }
+        if (bleStatus == connectionState.CONNECTED) {
+            bleState.setImageResource(R.drawable.ble_connected);
+            bleMacAddress.setText(AppConstant.MAC_ADDRESS);
+        }
+    }
+
+    //上传服务器返回
+    @Override
+    public void returnGetUpLoadAfterChecked(HttpResponse httpResponse) {
+        if (httpResponse.getSuccess()){
+            ToastUtil.showShort(httpResponse.getMsg());
+            qualityBleDataList.clear();
+            for (int i=0;i<qualityValueLengths.size();i++) {
+                qualityBleDataList.add(new QualityBleData());
+                qualityBleDataList.get(i).setValueLength(qualityValueLengths.get(i).getValueLength());
+            }
+            unMeasuredCounts = qualityValueLengths.size();
+            measuredCounts = qualityValueLengths.size();
+            qualityBleDataList.get(0).setSelected(true);
+            adapter.notifyDataSetChanged();
+            customer.setText("");
+        }else {
+            ToastUtil.showShort("该mac已经存在，不可重复添加");
+        }
     }
 
     @Override
@@ -706,20 +559,16 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
         if(msg=="connectFail"){
             cirProgressBarWithChoose.dismiss();
             bleState.setImageResource(R.drawable.ble_disconnected);
+            AppConstant.UUID_STRING= "";
+            AppConstant.MAC_ADDRESS= "";
         }
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        flag = false;//暂停识别卡
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (usbListenerBroadcast != null) {
-            unregisterReceiver(usbListenerBroadcast);
+        if (startingUpBroadcast != null) {
+            unregisterReceiver(startingUpBroadcast);
         }
     }
 }

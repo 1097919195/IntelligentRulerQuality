@@ -3,11 +3,22 @@ package com.jaydenxiao.common.baserx;
 import android.app.Activity;
 import android.content.Context;
 
+import com.google.gson.Gson;
 import com.jaydenxiao.common.baseapp.BaseApplication;
 import com.jaydenxiao.common.R;
+import com.jaydenxiao.common.basebean.HttpResponseError;
+import com.jaydenxiao.common.commonutils.LogUtils;
 import com.jaydenxiao.common.commonutils.NetWorkUtils;
 import com.jaydenxiao.common.commonwidget.LoadingDialog;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.IOException;
+
 import io.reactivex.observers.DisposableObserver;
+import retrofit2.HttpException;
 
 
 /**
@@ -80,6 +91,28 @@ public abstract class RxSubscriber<T> extends DisposableObserver<T> {
     }
     @Override
     public void onError(Throwable e) {
+//        if (e instanceof HttpException) {
+//            HttpException exception = (HttpException) e;
+//            int code = exception.response().code();
+//            LogUtils.loge("onErrorCode==" + code);
+//            try {
+//                String body = exception.response().errorBody().string();
+//                LogUtils.loge("body==" + body);
+//
+//                JSONObject jsonObject = new JSONObject(body);
+//                JSONArray jsonArray = jsonObject.getJSONArray("errors");
+//                LogUtils.loge("jsonArray==" +jsonArray);
+//                for (int i=0; i<jsonArray.length();i++) {
+//                    JSONObject ob  = jsonArray.getJSONObject(i);
+//                    String msg= ob.getString("message");
+//                    LogUtils.loge("msg==" +msg);
+//                }
+//            } catch (IOException e1) {
+//                e1.printStackTrace();
+//            } catch (JSONException e1) {
+//                e1.printStackTrace();
+//            }
+//        }
         if (showDialog)
             LoadingDialog.cancelDialogForLoading();
         e.printStackTrace();
@@ -90,6 +123,22 @@ public abstract class RxSubscriber<T> extends DisposableObserver<T> {
         //服务器
         else if (e instanceof ServerException) {
             _onError(e.getMessage());
+        }
+        else if (e instanceof HttpException) {
+            HttpException exception = (HttpException) e;
+            int code = exception.response().code();
+            LogUtils.loge("onErrorCode==" + code);
+            try {
+                String body = exception.response().errorBody().string();
+                LogUtils.loge("onErrorBody==" + body);
+
+                Gson gson = new Gson();
+                HttpResponseError responseError = gson.fromJson(body, HttpResponseError.class);
+                LogUtils.loge(responseError.getErrors().get(0).getMessage());
+                _onError(responseError.getErrors().get(0).getMessage());
+            } catch (IOException e1) {
+                e1.printStackTrace();
+            }
         }
         //其它
         else {

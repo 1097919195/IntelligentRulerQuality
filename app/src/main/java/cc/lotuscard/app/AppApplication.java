@@ -10,15 +10,16 @@ import com.polidea.rxandroidble2.RxBleClient;
 
 import java.util.UUID;
 
-import cc.lotuscard.identificationcardtest.BuildConfig;
+import cc.lotuscard.crashapp.AppCrashHandler;
+import cc.lotuscard.rulerQuality.BuildConfig;
+import io.reactivex.functions.Consumer;
+import io.reactivex.plugins.RxJavaPlugins;
 
 /**
  * APPLICATION
  */
 public class AppApplication extends BaseApplication {
     private RxBleClient rxBleClient;
-    private UUID characteristicUUID;
-    private String macAddress;
 
     @Override
     public void onCreate() {
@@ -26,6 +27,8 @@ public class AppApplication extends BaseApplication {
         //初始化logger,注意拷贝的话BuildConfig.LOG_DEBUG一定要是在当前module下的包名，配置文件中判断测适和发行版本
         LogUtils.logInit(BuildConfig.LOG_DEBUG);
         rxBleClient = RxBleClient.create(this);
+        setRxJavaErrorHandler();
+        AppCrashHandler.getInstance().init(this);//捕捉异常
     }
 
     public static RxBleClient getRxBleClient(Context context) {
@@ -33,23 +36,20 @@ public class AppApplication extends BaseApplication {
         return application.rxBleClient;
     }
 
-    public static void setUUID(Context context, UUID characteristicUUID) {
-        AppApplication application = ((AppApplication) context.getApplicationContext());
-        application.characteristicUUID = characteristicUUID;
-    }
+//    /**
+//     * 初始化RxJava回收执行的周期
+//     * @see io.reactivex.internal.schedulers.SchedulerPoolFactory
+//     */
+//    private static void initRxPurgeProperties() {
+//        System.setProperty(PURGE_ENABLED_KEY, "true");
+//        System.setProperty(PURGE_PERIOD_SECONDS_KEY, "3600");
+//    }
 
-    public static UUID getUUID(Context context) {
-        AppApplication application = ((AppApplication) context.getApplicationContext());
-        return application.characteristicUUID;
-    }
-
-    public static void setMacAddress(Context context, String macAddress) {
-        AppApplication application = ((AppApplication) context.getApplicationContext());
-        application.macAddress = macAddress;
-    }
-
-    public static String getMacAddress(Context context) {
-        AppApplication application = ((AppApplication) context.getApplicationContext());
-        return application.macAddress;
+    /**
+     * RxJava2 当取消订阅后(dispose())，RxJava抛出的异常后续无法接收(此时后台线程仍在跑，可能会抛出IO等异常),全部由RxJavaPlugin接收，需要提前设置ErrorHandler
+     * 详情：http://engineering.rallyhealth.com/mobile/rxjava/reactive/2017/03/15/migrating-to-rxjava-2.html#Error Handling
+     */
+    private void setRxJavaErrorHandler() {
+        RxJavaPlugins.setErrorHandler(throwable -> LogUtils.loge("throw test RxJava2===="+throwable.getMessage()));
     }
 }

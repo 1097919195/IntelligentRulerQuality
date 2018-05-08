@@ -101,7 +101,7 @@ public abstract class BaseActivity<T extends BasePresenter, E extends BaseModel>
         // 无标题
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         // 设置竖屏
-        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+//        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         // 设置横屏
 //        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         // 默认着色状态栏

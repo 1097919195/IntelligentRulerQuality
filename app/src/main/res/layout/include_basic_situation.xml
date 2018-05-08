@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+
+    <LinearLayout
+        android:id="@+id/basic"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingBottom="5dp"
+        android:paddingTop="5dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <android.support.v7.widget.AppCompatTextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="20dp"
+                android:text="蓝牙状态："
+                android:textColor="@color/c333"
+                android:textSize="@dimen/font_large" />
+
+            <android.support.v7.widget.AppCompatTextView
+                android:id="@+id/connect_state"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/primary"
+                android:textSize="@dimen/font_large"
+                android:text="未连接" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <android.support.v7.widget.AppCompatTextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="20dp"
+                android:text="设备名称："
+                android:textColor="@color/c333"
+                android:textSize="@dimen/font_large" />
+
+            <android.support.v7.widget.AppCompatTextView
+                android:id="@+id/bleName"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/primary"
+                android:textSize="@dimen/font_large" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <android.support.v7.widget.AppCompatTextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="20dp"
+                android:text="剩余电量："
+                android:textColor="@color/c333"
+                android:textSize="@dimen/font_large" />
+
+            <android.support.v7.widget.AppCompatTextView
+                android:id="@+id/de_battery"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/primary"
+                android:textSize="@dimen/font_large" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <android.support.v7.widget.AppCompatTextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="20dp"
+                android:text="获取卡号："
+                android:textAlignment="textEnd"
+                android:textColor="@color/c333"
+                android:textSize="@dimen/font_large" />
+
+            <android.support.v7.widget.AppCompatTextView
+                android:id="@+id/card_num"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="216354838"
+                android:textColor="@color/primary"
+                android:textSize="@dimen/font_large" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <android.support.v7.widget.AppCompatTextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="20dp"
+                android:text="订单编号："
+                android:textAlignment="textEnd"
+                android:textColor="@color/c333"
+                android:textSize="@dimen/font_large" />
+
+            <android.support.v7.widget.AppCompatTextView
+                android:id="@+id/qu_num"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="123456"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:textColor="@color/primary"
+                android:textSize="@dimen/font_large" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <android.support.v7.widget.AppCompatTextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="20dp"
+                android:text="服装品类："
+                android:textAlignment="textEnd"
+                android:textColor="@color/c333"
+                android:textSize="@dimen/font_large" />
+
+            <android.support.v7.widget.AppCompatTextView
+                android:id="@+id/clo_category"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="西装"
+                android:textColor="@color/primary"
+                android:textSize="@dimen/font_large" />
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!--<android.support.v7.widget.AppCompatTextView-->
+    <!--android:id="@+id/reconnect"-->
+    <!--android:layout_width="wrap_content"-->
+    <!--android:layout_height="wrap_content"-->
+    <!--android:layout_gravity="right"-->
+    <!--android:background="@color/primary"-->
+    <!--android:text="重新连接蓝牙"-->
+    <!--android:textColor="@color/white"-->
+    <!--android:textSize="@dimen/font_large"-->
+    <!--android:layout_alignParentRight="true"/>-->
+
+    <LinearLayout
+        android:id="@+id/display_big_grivity"
+        android:layout_marginTop="40dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/basic"
+        android:orientation="vertical">
+
+        <android.support.v7.widget.AppCompatTextView
+            android:id="@+id/big_grivity"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:text="部位部位部位"
+            android:textColor="@color/red"
+            android:textSize="100sp"
+            android:maxLines="2"
+            android:ellipsize="end" />
+
+    </LinearLayout>
+
+    <Button
+        android:layout_toLeftOf="@+id/big_save_data"
+        android:layout_marginRight="50dp"
+        android:layout_marginBottom="60dp"
+        android:layout_alignParentBottom="true"
+        android:gravity="center"
+        android:id="@+id/btn_back"
+        android:layout_width="100dp"
+        android:layout_height="50dp"
+        android:background="@drawable/btn_usual"
+        android:text="返回"
+        android:textColor="@color/white"
+        android:textSize="@dimen/font_large" />
+
+    <Button
+        android:layout_marginRight="60dp"
+        android:layout_alignParentRight="true"
+        android:layout_marginBottom="60dp"
+        android:layout_alignParentBottom="true"
+        android:gravity="center"
+        android:id="@+id/big_save_data"
+        android:layout_width="100dp"
+        android:layout_height="50dp"
+        android:background="@drawable/btn_usual"
+        android:text="保存"
+        android:textColor="@color/white"
+        android:textSize="@dimen/font_large" />
+
+    <Button
+        android:visibility="gone"
+        android:layout_marginLeft="-30dp"
+        android:layout_toRightOf="@+id/big_save_data"
+        android:layout_marginBottom="60dp"
+        android:layout_alignParentBottom="true"
+        android:gravity="center"
+        android:id="@+id/write"
+        android:layout_width="100dp"
+        android:layout_height="50dp"
+        android:background="@drawable/btn_usual"
+        android:text="写入"
+        android:textColor="@color/white"
+        android:textSize="@dimen/font_large" />
+</RelativeLayout>

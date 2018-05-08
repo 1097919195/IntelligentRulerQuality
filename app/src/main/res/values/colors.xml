@@ -4,7 +4,7 @@
     <color name="colorPrimaryDark">#303F9F</color>
     <color name="colorAccent">#FF4081</color>
 
-    <color name="primary">#3385d9</color>
+    <color name="primary">#29AAE3</color>
     <color name="primary_dark">#E12929</color>
     <color name="primary_darker">#CC1D1D</color>
     <color name="primary_lighter">#3df83f1d</color>
@@ -67,4 +67,5 @@
     <color name="scan_input_color">#fff</color>
     <color name="c999">#999999</color>
     <color name="ccc">#cccccc</color>
+    <color name="item_selector">#dcf2f7</color>
 </resources>

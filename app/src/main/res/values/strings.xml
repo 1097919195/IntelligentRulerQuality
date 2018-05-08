@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">格心科技质检演示APP</string>
+    <string name="app_name">智能尺管理</string>
     <string name="login_hint">请输入用户名</string>
     <string name="pwd">请输入密码</string>
     <string name="action_login">登录</string>

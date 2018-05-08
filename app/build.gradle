@@ -3,8 +3,12 @@ apply plugin: 'com.android.application'
 android {
     compileSdkVersion 26
     buildToolsVersion "27.0.3"
+
+    aaptOptions.cruncherEnabled = false
+    aaptOptions.useNewCruncher = false
+
     defaultConfig {
-        applicationId "com.lotuscard.identificationcardtest"
+        applicationId "com.lotuscard.rulerQuality"
         minSdkVersion 19
         targetSdkVersion 26
         versionCode 1
@@ -32,12 +36,15 @@ android {
 
 }
 
-dependencies {
-    compile fileTree(dir: 'libs', include: ['*.jar'])
 
+dependencies {
+    compile fileTree(include: ['*.jar'], dir: 'libs')
     compile project(':library:common')
     compile project(':library:irecyclerview')
 
     compile 'com.afollestad.material-dialogs:commons:0.9.4.5'
+    compile files('src/main/jniLibs/usc.jar')
+    compile 'com.jakewharton:butterknife:8.8.1'
+    annotationProcessor 'com.jakewharton:butterknife-compiler:8.8.1'
 
 }

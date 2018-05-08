@@ -2,11 +2,20 @@ package cc.lotuscard.presenter;
 
 
 import com.jaydenxiao.common.baserx.RxSubscriber;
+import com.jaydenxiao.common.commonutils.LogUtils;
 import com.polidea.rxandroidble2.RxBleDeviceServices;
 import com.polidea.rxandroidble2.scan.ScanResult;
 
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+
+import cc.lotuscard.app.AppConstant;
+import cc.lotuscard.bean.HttpResponse;
 import cc.lotuscard.bean.QualityData;
+import cc.lotuscard.bean.QualityValueLength;
 import cc.lotuscard.contract.QualityContract;
+import cc.lotuscard.utils.HexString;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.Consumer;
 
@@ -15,22 +24,22 @@ import io.reactivex.functions.Consumer;
  */
 
 public class QualityPresenter extends QualityContract.Presenter {
+    private static final int MEASURE_DURATION = 400;
     @Override
-    public void getQualityDataRequest(String id) {
+    public void getQualityDataRequest() {
+        mRxManage.add(mModel.getQualityData()
+                .subscribeWith(new RxSubscriber<List<QualityValueLength>>(mContext,false) {
+            @Override
+            protected void _onNext(List<QualityValueLength> qualityValueLengthList) {
+                mView.returnGetQualityData(qualityValueLengthList);
+            }
 
-        mRxManage.add(mModel.getQualityData(id)
-                .subscribeWith(new RxSubscriber<QualityData>(mContext, true) {
-                    @Override
-                    protected void _onNext(QualityData qualityData) {
-                        mView.returnGetQualityData(qualityData);
-                    }
+            @Override
+            protected void _onError(String message) {
+                mView.showErrorTip("loadingFail");
 
-                    @Override
-                    protected void _onError(String message) {
-                        mView.showErrorTip(message);
-
-                    }
-                }));
+            }
+        }));
     }
 
     @Override
@@ -57,10 +66,62 @@ public class QualityPresenter extends QualityContract.Presenter {
                 .doOnSubscribe(disposable->
                     mView.showLoading("chooseConnect"))
                 .subscribe(services -> {
-                    mView.returnChooseDeviceConnectWithSetUuid(services);
                     mView.returnChooseDeviceConnectWithSetAddress(mac);
-                },e -> mView.showErrorTip("connectFail")));
+                    mView.returnChooseDeviceConnectWithSetUuid(services);
+                },e -> {mView.showErrorTip("connectFail");LogUtils.loge(e.getCause().toString());}));
 
+    }
+
+    @Override
+    public void startMeasureRequest(UUID characteristicUUID) {
+        mRxManage.add(mModel.startMeasure(characteristicUUID)
+                .throttleFirst(MEASURE_DURATION, TimeUnit.MILLISECONDS)
+                .subscribeWith(new RxSubscriber<byte[]>(mContext,false) {
+                    @Override
+                    protected void _onNext(byte[] bytes) {
+                        String s = HexString.bytesToHex(bytes);
+                        if (s.length() == AppConstant.STANDARD_LENGTH) {
+                            int code = Integer.parseInt("8D6A", 16);
+                            int length = Integer.parseInt(s.substring(0, 4), 16);
+                            int angle = Integer.parseInt(s.substring(4, 8), 16);
+                            int battery = Integer.parseInt(s.substring(8, 12), 16);
+                            int a1 = length ^ code;
+                            int a2 = angle ^ code;
+                            int a3 = battery ^ code;
+                            a1 += AppConstant.ADJUST_VALUE;
+                            mView.returnStartMeasure(Float.valueOf(a1) / 10, Float.valueOf(a2) / 10, a3);
+                        }
+
+                    }
+
+                    @Override
+                    protected void _onError(String message) {
+
+                    }
+                }));
+    }
+
+    @Override
+    public void checkBleConnectStateRequest(String mac) {
+        mRxManage.add(mModel.checkBleConnectState(mac)
+                .subscribe(
+                        connectedState->mView.returnCheckBleConnectState(connectedState,mac)
+                ));
+    }
+
+    @Override
+    public void getUpLoadAfterCheckedRequest(String customer, String macAddress) {
+        mRxManage.add(mModel.getUpLoadAfterChecked(customer,macAddress).subscribeWith(new RxSubscriber<HttpResponse>(mContext,true) {
+            @Override
+            protected void _onNext(HttpResponse httpResponse) {
+                mView.returnGetUpLoadAfterChecked(httpResponse);
+            }
+
+            @Override
+            protected void _onError(String message) {
+                mView.showErrorTip(message);
+            }
+        }));
     }
 
 }

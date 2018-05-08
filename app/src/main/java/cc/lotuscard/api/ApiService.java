@@ -1,13 +1,21 @@
 package cc.lotuscard.api;
 
 
+import com.alibaba.fastjson.JSONObject;
+
+import java.util.ArrayList;
 import java.util.List;
 
+import cc.lotuscard.bean.HttpResponse;
 import cc.lotuscard.bean.QualityData;
+import cc.lotuscard.bean.RetQuality;
 import io.reactivex.Observable;
 import okhttp3.ResponseBody;
+import retrofit2.http.Field;
+import retrofit2.http.FormUrlEncoded;
 import retrofit2.http.GET;
 import retrofit2.http.Header;
+import retrofit2.http.POST;
 import retrofit2.http.Path;
 import retrofit2.http.Query;
 import retrofit2.http.Url;
@@ -17,12 +25,13 @@ import retrofit2.http.Url;
  * Created by xsf
  * on 2016.06.15:47
  */
-//@Path： 所有在网址中的参数（URL的问号前面），如：
+//        https://www.jianshu.com/p/7687365aa946
+//@Path： URL中有参数,如：
 //        http://102.10.10.132/api/Accounts/{accountId}
-//@Query：URL问号后面的参数，如：
-//        http://102.10.10.132/api/Comments?access_token={access_token}
+//@Query：参数在URL问号之后,如：
+//        http://102.10.10.132/api/Comments ? access_token={access_token}
 //@QueryMap：相当于多个@Query
-//@Field：用于POST请求，提交单个数据
+//@Field：用于POST请求，提交单个数据（不显示在网址中）
 //@Body： 相当于多个@Field，以对象的形式提交
 // Tip1
 //        使用@Field时记得添加@FormUrlEncoded
@@ -68,9 +77,35 @@ public interface ApiService {
 //            @Path("type") String type,
 //            @Path("startPage") int startPage);
 
+    /**
+     * Test Api
+     */
+
     @GET("clo/quality")
     Observable<QualityData> getQuality(
             @Query("id") String id
+    );
+
+    @FormUrlEncoded
+    @POST("clo/compare")
+    Observable<RetQuality> getUpLoadAfterChecked(
+            @Field("list") List<QualityData.Parts> qualityDataList
+    );
+
+    /**
+     *Release Api
+     */
+
+//    @GET("api/qc/itemsingle/{id}")
+//    Observable<HttpResponse<QualityData>> getQuality(
+//            @Path("id") String id
+//    );
+
+    @FormUrlEncoded
+    @POST("api/third/mac_checks")
+    Observable<HttpResponse> getUpLoadAfterChecked(
+            @Field("name") String customer,
+            @Field("mac_address") String macAddress
     );
 
 }

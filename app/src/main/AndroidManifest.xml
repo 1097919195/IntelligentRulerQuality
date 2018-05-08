@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="cc.lotuscard.identificationcardtest">
+    package="cc.lotuscard.rulerQuality">
 
     <uses-feature
         android:name="android.hardware.usb.host"
@@ -28,6 +28,8 @@
         android:name="android.permission.ACCESS_COARSE_LOCATION"
         android:maxSdkVersion="22" />
 
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <application
         android:name="cc.lotuscard.app.AppApplication"
         android:allowBackup="true"
@@ -37,34 +39,35 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
         <activity
-            android:name="cc.lotuscard.activity.LotusCardDemoActivity"
+            android:name="cc.lotuscard.activity.SignInActivity"
             android:launchMode="singleTop"
             android:alwaysRetainTaskState="true"
-            android:windowSoftInputMode="stateAlwaysHidden">
+            android:windowSoftInputMode="stateAlwaysHidden"
+            android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize"
+            >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <intent-filter>
-                <action android:name="android.hardware.usb.action.USB_ACCESSORY_ATTACHED" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
-            </intent-filter>
-
-            <meta-data
-                android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
-                android:resource="@xml/device_filter" />
         </activity>
-        <activity
-            android:name="cc.lotuscard.activity.CheckActivity"
+
+        <activity android:name="cc.lotuscard.activity.LotusCardDemoActivity"
             android:launchMode="singleTask"
-            >
+            android:alwaysRetainTaskState="true"
+            android:windowSoftInputMode="stateAlwaysHidden"
+            android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize">
 
         </activity>
 
-        <receiver android:name="cc.lotuscard.broadcast.UsbListenerBroadcast" />
+        <receiver android:name="cc.lotuscard.broadcast.StartingUpBroadcast">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
     </application>
 
 </manifest>
