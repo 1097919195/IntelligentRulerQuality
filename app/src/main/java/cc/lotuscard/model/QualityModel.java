@@ -4,8 +4,6 @@ package cc.lotuscard.model;
 import com.jaydenxiao.common.baserx.RxSchedulers;
 
 import com.jaydenxiao.common.commonutils.ACache;
-import com.jaydenxiao.common.commonutils.LogUtils;
-import com.jaydenxiao.common.commonutils.SPUtils;
 import com.polidea.rxandroidble2.RxBleClient;
 import com.polidea.rxandroidble2.RxBleConnection;
 import com.polidea.rxandroidble2.RxBleDeviceServices;
@@ -18,7 +16,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import cc.lotuscard.activity.LotusCardDemoActivity;
 import cc.lotuscard.api.Api;
 import cc.lotuscard.api.HostType;
 import cc.lotuscard.app.AppApplication;
@@ -96,6 +93,14 @@ public class QualityModel implements QualityContract.Model {
         return Api.getDefault(HostType.QUALITY_DATA)
                 .getUpLoadAfterChecked(customer,macAddress)
                 .compose(RxSchedulers.io_main());
+    }
+
+    @Override
+    public Observable<HttpResponse> getFuzzySearchData(String name) {
+        return Api.getDefault(HostType.QUALITY_DATA)
+                .getFuzzySearch(name)
+                .compose(RxSchedulers.io_main());
+
     }
 
 }

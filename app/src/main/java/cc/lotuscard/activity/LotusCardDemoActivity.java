@@ -4,38 +4,33 @@ import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattService;
-import android.content.Intent;
 import android.content.IntentFilter;
-import android.os.Bundle;
-import android.os.Handler;
-import android.os.Message;
+import android.graphics.drawable.ColorDrawable;
 import android.support.annotation.NonNull;
 import android.support.v7.widget.StaggeredGridLayoutManager;
 import android.text.TextUtils;
-import android.util.Log;
+import android.view.Gravity;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
-import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.ListAdapter;
 import android.widget.TextView;
 
 import com.afollestad.materialdialogs.DialogAction;
 import com.afollestad.materialdialogs.MaterialDialog;
+import com.alibaba.fastjson.JSON;
 import com.aspsine.irecyclerview.IRecyclerView;
 import com.aspsine.irecyclerview.universaladapter.ViewHolderHelper;
 import com.aspsine.irecyclerview.universaladapter.recyclerview.CommonRecycleViewAdapter;
 import com.aspsine.irecyclerview.universaladapter.recyclerview.OnItemClickListener;
-import com.jakewharton.rxbinding2.view.RxView;
 import com.jakewharton.rxbinding2.widget.RxTextView;
 import com.jaydenxiao.common.base.BaseActivity;
+import com.jaydenxiao.common.base.BasePopupWindow;
 import com.jaydenxiao.common.baserx.RxBus2;
-import com.jaydenxiao.common.baserx.RxSchedulers;
-import com.jaydenxiao.common.baserx.RxSubscriber;
-import com.jaydenxiao.common.commonutils.ImageLoaderUtils;
 import com.jaydenxiao.common.commonutils.LogUtils;
-import com.jaydenxiao.common.commonutils.SPUtils;
 import com.jaydenxiao.common.commonutils.ToastUtil;
 import com.polidea.rxandroidble2.RxBleClient;
 import com.polidea.rxandroidble2.RxBleConnection;
@@ -45,13 +40,14 @@ import com.polidea.rxandroidble2.scan.ScanResult;
 import com.tbruyelle.rxpermissions2.RxPermissions;
 
 
-import org.w3c.dom.Text;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import butterknife.BindView;
@@ -60,14 +56,12 @@ import cc.lotuscard.app.AppConstant;
 import cc.lotuscard.bean.BleDevice;
 import cc.lotuscard.bean.HttpResponse;
 import cc.lotuscard.bean.QualityBleData;
-import cc.lotuscard.bean.QualityData;
 import cc.lotuscard.bean.QualityValueLength;
 import cc.lotuscard.contract.QualityContract;
 import cc.lotuscard.rulerQuality.R;
 import cc.lotuscard.model.QualityModel;
 import cc.lotuscard.presenter.QualityPresenter;
 import cc.lotuscard.broadcast.StartingUpBroadcast;
-import io.reactivex.Observable;
 import io.reactivex.functions.Consumer;
 
 
@@ -91,6 +85,8 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
     EditText customer;
     @BindView(R.id.irc_quality_data)
     IRecyclerView irc;
+    @BindView(R.id.macCounts)
+    TextView macCounts;
     private CommonRecycleViewAdapter<QualityBleData> adapter;
     List<QualityBleData> qualityBleDataList = new ArrayList<>();
 
@@ -102,6 +98,16 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
     boolean remuasure = false;
     List<Integer> canRemeasureData = new ArrayList<>();
     List<Integer> unqualifiedData = new ArrayList<>();
+
+
+    @BindView(R.id.ircWithSearch)
+    IRecyclerView ircWithSearch;
+    CommonRecycleViewAdapter<String> searchAdapter;
+    BasePopupWindow popupWindow;
+    View pop;
+    IRecyclerView ircSearch;
+    List<String> searchName = new ArrayList<>();
+    boolean stopSearch = false;
 
     @Override
     protected void onResume() {
@@ -221,6 +227,8 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
     public void initView() {
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);// 设置全屏
         StartingUpBroadcastRecive();
+        pop = LayoutInflater.from(this).inflate(R.layout.pop_fuzzysearch, null);
+        ircSearch = pop.findViewById(R.id.searchList);
 
         initRcycleAdapter();
         itemClickRemeasure();
@@ -230,21 +238,56 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
     }
 
     private void initSearchAdapter() {
-        
+        searchAdapter= new CommonRecycleViewAdapter<String>(this,R.layout.item_customer,searchName) {
+            @Override
+            public void convert(ViewHolderHelper helper, String names) {
+                TextView customer = helper.getView(R.id.customerName);
+                customer.setText(names);
+            }
+        };
+
+        //popupwindow
+        ircSearch.setAdapter(searchAdapter);
+        ircSearch.setLayoutManager(new StaggeredGridLayoutManager(1,StaggeredGridLayoutManager.VERTICAL));
+        //framlayout
+        ircWithSearch.setAdapter(searchAdapter);
+        ircWithSearch.setLayoutManager(new StaggeredGridLayoutManager(1,StaggeredGridLayoutManager.VERTICAL));
+
+
+        searchAdapter.setOnItemClickListener(new OnItemClickListener() {
+            @Override
+            public void onItemClick(ViewGroup parent, View view, Object o, int position) {
+                ircWithSearch.setVisibility(View.GONE);
+                customer.setText(searchName.get(position));
+                stopSearch = true;
+            }
+
+            @Override
+            public boolean onItemLongClick(ViewGroup parent, View view, Object o, int position) {
+                return false;
+            }
+        });
+
     }
 
     private void initListener() {
         RxTextView.textChanges(customer)
-                .debounce( 700 , TimeUnit.MILLISECONDS )
+                .debounce( 600 , TimeUnit.MILLISECONDS )
                 .subscribe(new Consumer<Object>() {
                     @Override
                     public void accept(Object o) throws Exception {
-                        if (customer.getEditableText().length() > 0) {
-                            // FIXME: 2018/5/8 0008 
-                            mPresenter.getUpLoadAfterCheckedRequest(customer.getEditableText().toString().trim(),AppConstant.MAC_ADDRESS);
+                        if (!TextUtils.isEmpty(customer.getEditableText()) && !stopSearch) {
+                            mPresenter.getFuzzySearchDataRequest(customer.getEditableText().toString());
                         }
+                        ircWithSearch.post(() -> {
+                            if (ircWithSearch.getVisibility() == View.VISIBLE) {
+                                ircWithSearch.setVisibility(View.GONE);
+                            }
+                        });
                     }
                 });
+
+        customer.setOnClickListener(v->{stopSearch = false;});
     }
 
     private void itemClickRemeasure() {
@@ -521,8 +564,19 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
 
     //上传服务器返回
     @Override
-    public void returnGetUpLoadAfterChecked(HttpResponse httpResponse) {
+    public void returnGetUpLoadAfterChecked(HttpResponse httpResponse){
         if (httpResponse.getSuccess()){
+            //设置录入总数
+            try {
+                JSONObject jsonObject = new JSONObject(httpResponse.getData().toString());
+                LogUtils.loge("录入总数"+jsonObject.getString("count"));
+                float f = Float.parseFloat(jsonObject.getString("count"));
+                int i = (int) f;
+                macCounts.setText(String.valueOf(i));
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+
             ToastUtil.showShort(httpResponse.getMsg());
             qualityBleDataList.clear();
             for (int i=0;i<qualityValueLengths.size();i++) {
@@ -537,6 +591,43 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
         }else {
             ToastUtil.showShort("该mac已经存在，不可重复添加");
         }
+    }
+
+    @Override
+    public void returnGetFuzzySearchData(HttpResponse fuzzySearchData) {
+        searchName.clear();
+        if (fuzzySearchData != null) {
+            try {
+                String s = JSON.toJSONString(fuzzySearchData.getData());
+                JSONArray jsonArray = new JSONArray(s);
+                LogUtils.loge("jsonArray==="+jsonArray);
+                for (int i=0; i<jsonArray.length();i++) {
+                    JSONObject ob  = jsonArray.getJSONObject(i);
+                    String name= ob.getString("name");
+                    LogUtils.loge("name==" +name);
+                    searchName.add(name);
+                }
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+            if (searchName.size() > 0) {
+                searchAdapter.notifyDataSetChanged();
+                ircWithSearch.setVisibility(View.VISIBLE);
+//                showPopupWindow();
+            }
+        }
+    }
+
+    private void showPopupWindow() {
+        popupWindow = new BasePopupWindow(this);
+        popupWindow.setWidth(ViewGroup.LayoutParams.MATCH_PARENT);
+        popupWindow.setHeight(ViewGroup.LayoutParams.WRAP_CONTENT);
+//        popupWindow.setHeight(240);
+        popupWindow.setContentView(pop);
+        popupWindow.setOutsideTouchable(true);
+        popupWindow.setFocusable(false);//不然底部不可编辑
+        popupWindow.setBackgroundDrawable(new ColorDrawable(0x00000000));
+        popupWindow.showAsDropDown(customer, Gravity.BOTTOM, 0, 0);
     }
 
     @Override

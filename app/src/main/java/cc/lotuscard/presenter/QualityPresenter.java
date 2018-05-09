@@ -3,8 +3,9 @@ package cc.lotuscard.presenter;
 
 import com.jaydenxiao.common.baserx.RxSubscriber;
 import com.jaydenxiao.common.commonutils.LogUtils;
-import com.polidea.rxandroidble2.RxBleDeviceServices;
 import com.polidea.rxandroidble2.scan.ScanResult;
+
+import org.json.JSONException;
 
 import java.util.List;
 import java.util.UUID;
@@ -12,12 +13,9 @@ import java.util.concurrent.TimeUnit;
 
 import cc.lotuscard.app.AppConstant;
 import cc.lotuscard.bean.HttpResponse;
-import cc.lotuscard.bean.QualityData;
 import cc.lotuscard.bean.QualityValueLength;
 import cc.lotuscard.contract.QualityContract;
 import cc.lotuscard.utils.HexString;
-import io.reactivex.disposables.Disposable;
-import io.reactivex.functions.Consumer;
 
 /**
  * Created by Administrator on 2018/3/28 0028.
@@ -114,7 +112,11 @@ public class QualityPresenter extends QualityContract.Presenter {
         mRxManage.add(mModel.getUpLoadAfterChecked(customer,macAddress).subscribeWith(new RxSubscriber<HttpResponse>(mContext,true) {
             @Override
             protected void _onNext(HttpResponse httpResponse) {
-                mView.returnGetUpLoadAfterChecked(httpResponse);
+                try {
+                    mView.returnGetUpLoadAfterChecked(httpResponse);
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
             }
 
             @Override
@@ -122,6 +124,15 @@ public class QualityPresenter extends QualityContract.Presenter {
                 mView.showErrorTip(message);
             }
         }));
+    }
+
+    @Override
+    public void getFuzzySearchDataRequest(String name) {
+        mRxManage.add(mModel.getFuzzySearchData(name)
+                .subscribe(
+                        fuzzySearchData -> mView.returnGetFuzzySearchData(fuzzySearchData),
+                        e->{mView.showErrorTip(e.getMessage());}
+                ));
     }
 
 }

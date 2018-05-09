@@ -1,24 +1,17 @@
 package cc.lotuscard.api;
 
 
-import com.alibaba.fastjson.JSONObject;
-
-import java.util.ArrayList;
 import java.util.List;
 
 import cc.lotuscard.bean.HttpResponse;
 import cc.lotuscard.bean.QualityData;
 import cc.lotuscard.bean.RetQuality;
 import io.reactivex.Observable;
-import okhttp3.ResponseBody;
 import retrofit2.http.Field;
 import retrofit2.http.FormUrlEncoded;
 import retrofit2.http.GET;
-import retrofit2.http.Header;
 import retrofit2.http.POST;
-import retrofit2.http.Path;
 import retrofit2.http.Query;
-import retrofit2.http.Url;
 
 /**
  * des:ApiService
@@ -108,4 +101,8 @@ public interface ApiService {
             @Field("mac_address") String macAddress
     );
 
+    @GET("api/third/mac_checks")
+    Observable<HttpResponse> getFuzzySearch(
+            @Query("name") String name
+    );
 }

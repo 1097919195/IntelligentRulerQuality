@@ -8,11 +8,12 @@ import com.polidea.rxandroidble2.RxBleDeviceServices;
 import com.polidea.rxandroidble2.scan.ScanResult;
 
 
+import org.json.JSONException;
+
 import java.util.List;
 import java.util.UUID;
 
 import cc.lotuscard.bean.HttpResponse;
-import cc.lotuscard.bean.QualityData;
 import cc.lotuscard.bean.QualityValueLength;
 import io.reactivex.Maybe;
 import io.reactivex.Observable;
@@ -35,6 +36,8 @@ public interface QualityContract {
         Observable<RxBleConnection.RxBleConnectionState> checkBleConnectState(String mac);
 
         Observable<HttpResponse> getUpLoadAfterChecked(String customer, String macAddress);
+
+        Observable<HttpResponse> getFuzzySearchData(String name);
     }
 
     interface View extends BaseView {
@@ -49,7 +52,9 @@ public interface QualityContract {
 
         void returnCheckBleConnectState(RxBleConnection.RxBleConnectionState connectionState,String mac);
 
-        void returnGetUpLoadAfterChecked(HttpResponse httpResponse);
+        void returnGetUpLoadAfterChecked(HttpResponse httpResponse) throws JSONException;
+
+        void returnGetFuzzySearchData(HttpResponse fuzzySearchData);
     }
 
     abstract class Presenter extends BasePresenter<View, Model> {
@@ -64,6 +69,8 @@ public interface QualityContract {
         public abstract void checkBleConnectStateRequest(String mac);
 
         public abstract void getUpLoadAfterCheckedRequest(String customer, String macAddress);
+
+        public abstract void getFuzzySearchDataRequest(String name);
     }
 
 }
