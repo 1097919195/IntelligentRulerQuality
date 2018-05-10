@@ -7,6 +7,8 @@ import android.bluetooth.BluetoothGattService;
 import android.content.IntentFilter;
 import android.graphics.drawable.ColorDrawable;
 import android.support.annotation.NonNull;
+import android.support.v4.content.ContextCompat;
+import android.support.v7.widget.DividerItemDecoration;
 import android.support.v7.widget.StaggeredGridLayoutManager;
 import android.text.TextUtils;
 import android.view.Gravity;
@@ -16,6 +18,7 @@ import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.ListAdapter;
 import android.widget.TextView;
 
@@ -252,6 +255,13 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
         //framlayout
         ircWithSearch.setAdapter(searchAdapter);
         ircWithSearch.setLayoutManager(new StaggeredGridLayoutManager(1,StaggeredGridLayoutManager.VERTICAL));
+
+        //设置分割线
+//        ircWithSearch.addItemDecoration(new DividerItemDecoration(this,DividerItemDecoration.VERTICAL_LIST));//默认
+        //添加自定义分割线
+        DividerItemDecoration divider = new DividerItemDecoration(this,DividerItemDecoration.VERTICAL);//这里导入的包和自己封装的库不同
+        divider.setDrawable(ContextCompat.getDrawable(this,R.drawable.custom_divider));
+        ircWithSearch.addItemDecoration(divider);
 
 
         searchAdapter.setOnItemClickListener(new OnItemClickListener() {

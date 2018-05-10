@@ -18,7 +18,7 @@
             android:ellipsize="end"
             android:gravity="center"
             android:lines="1"
-            tools:text="请测10cm"
+            tools:text="10cm"
             android:textColor="@color/black"
             android:textSize="@dimen/font_large" />
 
