@@ -271,7 +271,6 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
                 customer.setText(searchName.get(position));
                 stopSearch = true;
             }
-
             @Override
             public boolean onItemLongClick(ViewGroup parent, View view, Object o, int position) {
                 return false;
