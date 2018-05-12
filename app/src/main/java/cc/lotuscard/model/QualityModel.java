@@ -56,7 +56,7 @@ public class QualityModel implements QualityContract.Model {
     public Observable<ScanResult> getBleDeviceData() {
         return rxBleClient.scanBleDevices(
                 new ScanSettings.Builder()
-                        .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+                        .setScanMode(ScanSettings.SCAN_MODE_BALANCED)//此段代码会导致部分设备找不打对应的RxBleDeviceServices,模式一定要对
                         .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
                         .build(),
                 new ScanFilter.Builder().build()

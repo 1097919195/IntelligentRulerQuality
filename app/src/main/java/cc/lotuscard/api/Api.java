@@ -221,6 +221,7 @@ public class Api {
         @Override
         public T apply(HttpResponse<T> httpResponse) {
             //全局处理错误信息
+            T data = null;
             int status = httpResponse.getStatus();
             if (status >= EXCEPTION_THRESHOLD) {
                 if (status == CONNECT_TIME_OUT) {
@@ -232,7 +233,10 @@ public class Api {
             if (httpResponse.getData() == null) {
                 throw new ApiException("暂无数据");
             }
-
+            if (status == 200) {
+                data = httpResponse.getData();
+            }
+//            return data;//统一处理但是不利于指向对应的错误类型
             return httpResponse.getData();
         }
     }
