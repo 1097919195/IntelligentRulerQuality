@@ -174,7 +174,9 @@
                         android:layout_height="wrap_content"
                         app:loadMoreEnabled="false"
                         app:refreshEnabled="false"
-                        android:overScrollMode="never"></com.aspsine.irecyclerview.IRecyclerView>
+                        android:overScrollMode="never">
+
+                    </com.aspsine.irecyclerview.IRecyclerView>
                 </LinearLayout>
 
                 <com.aspsine.irecyclerview.IRecyclerView

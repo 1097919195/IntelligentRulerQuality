@@ -101,7 +101,7 @@ public class Api {
         File cacheFile = new File(BaseApplication.getAppContext().getCacheDir(), "cache");
         Cache cache = new Cache(cacheFile, 1024 * 1024 * 100); //100Mb
         //添加请求头，增加头部信息
-        Interceptor headerInterceptor =new Interceptor() {
+        Interceptor headerInterceptor = new Interceptor() {
             @Override
             public Response intercept(Chain chain) throws IOException {
                 //将请求体设置给请求方法内
@@ -161,11 +161,11 @@ public class Api {
      * OkHttpClient
      * @return
      */
-    public static OkHttpClient getOkHttpClient(){
-        Api retrofitManager = sRetrofitManager.get(HostType.NETEASE_NEWS_VIDEO);
+    public static OkHttpClient getOkHttpClient(int hostType){
+        Api retrofitManager = sRetrofitManager.get(hostType);
         if (retrofitManager == null) {
-            retrofitManager = new Api(HostType.NETEASE_NEWS_VIDEO);
-            sRetrofitManager.put(HostType.NETEASE_NEWS_VIDEO, retrofitManager);
+            retrofitManager = new Api(hostType);
+            sRetrofitManager.put(hostType, retrofitManager);
         }
         return retrofitManager.okHttpClient;
     }

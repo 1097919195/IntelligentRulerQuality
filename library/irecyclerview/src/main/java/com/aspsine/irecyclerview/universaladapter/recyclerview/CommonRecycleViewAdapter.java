@@ -90,7 +90,7 @@ public abstract class CommonRecycleViewAdapter<T> extends RecyclerView.Adapter<V
             {
                 if (mOnItemClickListener != null)
                 {
-                    int position = getPosition(viewHolder)-2;//封装有列表头，没使用要减去
+                    int position = getPosition(viewHolder)-2;//封装有列表头，刷新，使用IRecyclerView要减2
                     mOnItemClickListener.onItemClick(parent, v, mDatas.get(position), position);
                 }
             }
@@ -104,7 +104,7 @@ public abstract class CommonRecycleViewAdapter<T> extends RecyclerView.Adapter<V
             {
                 if (mOnItemClickListener != null)
                 {
-                    int position = getPosition(viewHolder)-2;//封装有列表头，没使用要减去
+                    int position = getPosition(viewHolder)-2;//封装有列表头，刷新，使用IRecyclerView要减2
                     return mOnItemClickListener.onItemLongClick(parent, v, mDatas.get(position), position);
                 }
                 return false;
