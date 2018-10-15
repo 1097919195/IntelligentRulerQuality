@@ -43,7 +43,7 @@
             android:launchMode="singleTop"
             android:alwaysRetainTaskState="true"
             android:windowSoftInputMode="stateAlwaysHidden"
-            android:screenOrientation="portrait"
+            android:screenOrientation="nosensor"
             android:configChanges="orientation|screenSize"
             >
             <intent-filter>
@@ -57,7 +57,7 @@
             android:launchMode="singleTask"
             android:alwaysRetainTaskState="true"
             android:windowSoftInputMode="stateAlwaysHidden"
-            android:screenOrientation="portrait"
+            android:screenOrientation="nosensor"
             android:configChanges="orientation|screenSize">
 
         </activity>
