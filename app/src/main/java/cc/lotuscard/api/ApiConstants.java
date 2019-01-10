@@ -19,6 +19,7 @@ package cc.lotuscard.api;
 public class ApiConstants {
     public static final String QUALITY_HOST_TEST = "http://rap2api.taobao.org/app/mock/8690/";
     public static final String QUALITY_HOST = "http://www.npclo.com/";
+    public static final String RULER_HOST = "http://n.npclo.com/";
 
     /**
      * 获取对应的host
@@ -34,6 +35,9 @@ public class ApiConstants {
                 break;
             case HostType.QUALITY_DATA:
                 host = QUALITY_HOST;
+                break;
+            case HostType.RULER_DATA:
+                host = RULER_HOST;
                 break;
             default:
                 host = "";

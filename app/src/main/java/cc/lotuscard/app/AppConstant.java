@@ -13,6 +13,7 @@ public class AppConstant {
     public static final int STANDARD_LENGTH = 16;
     public static final int ADJUST_VALUE = 14;
     public static String UUID_STRING="";
+    public static String UUID_WRITE="";
     public static String MAC_ADDRESS="";
     public static final String CONNECT_SUCCEED="CONNECT_SUCCEED";
     public static final String NO_BLE_FIND="NO_BLE_FIND";

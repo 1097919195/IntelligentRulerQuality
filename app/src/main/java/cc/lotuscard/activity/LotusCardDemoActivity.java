@@ -16,6 +16,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -33,6 +34,7 @@ import com.jakewharton.rxbinding2.widget.RxTextView;
 import com.jaydenxiao.common.base.BaseActivity;
 import com.jaydenxiao.common.base.BasePopupWindow;
 import com.jaydenxiao.common.baserx.RxBus2;
+import com.jaydenxiao.common.baserx.RxSchedulers;
 import com.jaydenxiao.common.commonutils.LogUtils;
 import com.jaydenxiao.common.commonutils.ToastUtil;
 import com.polidea.rxandroidble2.RxBleClient;
@@ -48,9 +50,11 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import butterknife.BindView;
@@ -65,7 +69,13 @@ import cc.lotuscard.rulerQuality.R;
 import cc.lotuscard.model.QualityModel;
 import cc.lotuscard.presenter.QualityPresenter;
 import cc.lotuscard.broadcast.StartingUpBroadcast;
+import cc.lotuscard.utils.HexString;
+import cc.lotuscard.utils.HexStringTwo;
+import io.reactivex.Observable;
+import io.reactivex.disposables.CompositeDisposable;
 import io.reactivex.functions.Consumer;
+import io.reactivex.observers.DisposableObserver;
+import io.reactivex.subjects.PublishSubject;
 
 
 public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,QualityModel> implements QualityContract.View{
@@ -90,6 +100,8 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
     IRecyclerView irc;
     @BindView(R.id.macCounts)
     TextView macCounts;
+    @BindView(R.id.change_name)
+    Button change_name;
     private CommonRecycleViewAdapter<QualityBleData> adapter;
     List<QualityBleData> qualityBleDataList = new ArrayList<>();
 
@@ -111,6 +123,7 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
     IRecyclerView ircSearch;
     List<String> searchName = new ArrayList<>();
     boolean stopSearch = false;
+    String result;//格式化尺子编号
 
     @Override
     protected void onResume() {
@@ -297,6 +310,82 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
                 });
 
         customer.setOnClickListener(v->{stopSearch = false;});
+
+        mPresenter.getRulerNumDataRequest();//初始化返回当前尺子可用的编码（每次会加1）
+
+        // TODO: 2019/1/10 0010 之前这个蓝牙反正连这的时候不能发送指令了，或者发之前先断开，具体能尺子到了再看
+        //发送完指令需要断开连接使修改生效
+        change_name.setOnClickListener(v -> {
+            if(!AppConstant.UUID_STRING.equals("")){
+                mPresenter.getRulerNumDataRequest();//初始化返回当前尺子可用的编码（每次会加1）
+//                String hexstring = strTo16(result);//字符串转化为16进制字符串
+                String checkCode1 = result.substring(0, 2);//注意substring是不包括结尾的索引的
+                String checkCode2 = result.substring(2, 4);
+                //校验码之和  不知道是不是要转化成十六进制的
+//                String checkCodeResult = strTo16(checkCode1)+strTo16(checkCode2);
+                int checkCodeResult = Integer.parseInt(checkCode1)+Integer.parseInt(checkCode2);
+                LogUtils.loge(checkCode1+"==="+checkCode2+"==="+checkCodeResult);
+                String instructions = "A0" + result + String.valueOf(checkCodeResult);//最终发送的指令 A0这个帧头是固定的
+                LogUtils.loge("instructions=="+instructions);
+
+                CompositeDisposable disposable = new CompositeDisposable();
+                PublishSubject<Boolean> disconnectTriggerSubject = PublishSubject.create();
+                byte[] bytes = HexStringTwo.hexStringToBytes(instructions);//一个字节可表示为两个十六进制数字  A0 00 01 01
+                LogUtils.loge("length: "+bytes.length);
+                byte[] bytes1 = Arrays.copyOfRange(bytes, 0, 1);
+                byte[] bytes2 = Arrays.copyOfRange(bytes, 1, 2);
+                byte[] bytes3 = Arrays.copyOfRange(bytes, 2, 3);
+                byte[] bytes4 = Arrays.copyOfRange(bytes, 3, 4);
+                ArrayList<byte[]> arrayList = new ArrayList<>();
+                arrayList.add(bytes1);
+                arrayList.add(bytes2);
+                arrayList.add(bytes3);
+                arrayList.add(bytes4);
+
+                DisposableObserver<Long> disposableObserver = new DisposableObserver<Long>() {
+                    @Override
+                    public void onNext(Long l) {
+                        int i = l.intValue();
+                        if (i == arrayList.size()) {
+                            disposable.clear();
+                            LogUtils.loge("complete");
+                        } else {
+                            AppApplication.getRxBleClient(AppApplication.getAppContext()).getBleDevice(AppConstant.MAC_ADDRESS)
+                                    .establishConnection(false)
+                                    .takeUntil(disconnectTriggerSubject)
+                                    .flatMapSingle(rxBleConnection -> rxBleConnection.writeCharacteristic(UUID.fromString(AppConstant.UUID_WRITE), arrayList.get(i)))
+//                                    .firstElement()
+                                    .subscribe(
+                                            by ->
+                                            {
+                                                LogUtils.loge("write=======" + HexString.bytesToHex(by));
+                                                disconnectTriggerSubject.onNext(true);
+                                            }
+                                            , e -> LogUtils.loge(i + " times " + e.toString())
+                                    );
+                        }
+                    }
+
+                    @Override
+                    public void onError(Throwable e) {
+
+                    }
+
+                    @Override
+                    public void onComplete() {
+
+                    }
+                };
+
+                Observable.interval(0, 200, TimeUnit.MILLISECONDS)
+                        .compose(RxSchedulers.io_main())
+                        .subscribe(disposableObserver);
+                disposable.add(disposableObserver);
+            }else {
+                ToastUtil.showShort("当前UUID已为空，请重新连接智能尺");
+            }
+
+        });
     }
 
     private void itemClickRemeasure() {
@@ -469,10 +558,34 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
     //获取到UUID并且建立通信
     @Override
     public void returnChooseDeviceConnectWithSetUuid(RxBleDeviceServices deviceServices) {
-        for (BluetoothGattService service : deviceServices.getBluetoothGattServices()) {
-            for (BluetoothGattCharacteristic characteristic : service.getCharacteristics()) {
+        //蓝牙第一版（只有通讯）
+//        LogUtils.loge("asdf"+deviceServices.getBluetoothGattServices().size());
+//        for (BluetoothGattService service : deviceServices.getBluetoothGattServices()) {
+//            for (BluetoothGattCharacteristic characteristic : service.getCharacteristics()) {
+//                LogUtils.loge("asdf===="+characteristic.getUuid().toString());
+//                if (isCharacteristicNotifiable(characteristic)) {
+//                    AppConstant.UUID_STRING = characteristic.getUuid().toString();
+//                    LogUtils.loge("asdf"+AppConstant.UUID_STRING);
+//                    ToastUtil.showShort("蓝牙配对成功，等待建立通信中...");
+//                    cirProgressBarWithChoose.dismiss();
+//                    mPresenter.startMeasureRequest(characteristic.getUuid());
+//                    if (AppConstant.MAC_ADDRESS!="") {
+//                        mPresenter.checkBleConnectStateRequest(AppConstant.MAC_ADDRESS);
+//                    }
+//                    break;
+//                }
+//            }
+//        }
+        //蓝牙第二版（可写--改名）通过FastBle已知索引位置
+            for (BluetoothGattCharacteristic characteristic : deviceServices.getBluetoothGattServices().get(3).getCharacteristics()) {
+                if ((characteristic.getProperties() & BluetoothGattCharacteristic.PROPERTY_WRITE) != 0) {
+                    // TODO: 2019/1/10 0010 能获取到二个的问题
+                    AppConstant.UUID_WRITE = characteristic.getUuid().toString();
+                    LogUtils.loge("uuid"+characteristic.getUuid().toString());
+                }
                 if (isCharacteristicNotifiable(characteristic)) {
                     AppConstant.UUID_STRING = characteristic.getUuid().toString();
+                    LogUtils.loge("uuid"+AppConstant.UUID_STRING);
                     ToastUtil.showShort("蓝牙配对成功，等待建立通信中...");
                     cirProgressBarWithChoose.dismiss();
                     mPresenter.startMeasureRequest(characteristic.getUuid());
@@ -482,7 +595,6 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
                     break;
                 }
             }
-        }
     }
     private boolean isCharacteristicNotifiable(BluetoothGattCharacteristic characteristic) {
         return (characteristic.getProperties() & BluetoothGattCharacteristic.PROPERTY_NOTIFY) != 0;
@@ -625,6 +737,30 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
 //                showPopupWindow();
             }
         }
+    }
+
+    @Override
+    public void returnRulerNumData(Integer data) {
+        if (data < 10000) {//Integer类会自动拆箱i.intValue()
+            result = String.format("%0" + 4 + "d", data);
+            //将其转换为十六进制并输出
+            LogUtils.loge("ruler_num"+data);
+            LogUtils.loge("ruler_num"+result);
+        }else {
+            ToastUtil.showShort("服务器返回结果超过四位数，无法操作，请处理数据库编号");
+        }
+
+    }
+
+    //字符串转化成为16进制字符串
+    public static String strTo16(String s) {
+        String str = "";
+        for (int i = 0; i < s.length(); i++) {
+            int ch = (int) s.charAt(i);
+            String s4 = Integer.toHexString(ch);
+            str = str + s4;
+        }
+        return str;
     }
 
     private void showPopupWindow() {

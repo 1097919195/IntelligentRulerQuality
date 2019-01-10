@@ -103,4 +103,11 @@ public class QualityModel implements QualityContract.Model {
 
     }
 
+    @Override
+    public Observable<Integer> getRulerNumData() {
+        return Api.getDefault(HostType.RULER_DATA)
+                .getRulerNum()
+                .compose(RxSchedulers.io_main());
+    }
+
 }

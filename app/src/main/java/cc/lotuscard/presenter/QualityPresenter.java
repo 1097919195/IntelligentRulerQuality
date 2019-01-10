@@ -135,4 +135,13 @@ public class QualityPresenter extends QualityContract.Presenter {
                 ));
     }
 
+    @Override
+    public void getRulerNumDataRequest() {
+        mRxManage.add(mModel.getRulerNumData()
+                .subscribe(
+                        num -> mView.returnRulerNumData(num),
+                        e->{mView.showErrorTip(e.getMessage());}
+                ));
+    }
+
 }

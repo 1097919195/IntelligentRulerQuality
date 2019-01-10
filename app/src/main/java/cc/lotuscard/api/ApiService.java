@@ -105,4 +105,9 @@ public interface ApiService {
     Observable<HttpResponse> getFuzzySearch(
             @Query("name") String name
     );
+
+    //获取尺子编号
+    @GET("get_ruler_num")
+    Observable<Integer> getRulerNum(
+    );
 }

@@ -38,6 +38,8 @@ public interface QualityContract {
         Observable<HttpResponse> getUpLoadAfterChecked(String customer, String macAddress);
 
         Observable<HttpResponse> getFuzzySearchData(String name);
+
+        Observable<Integer> getRulerNumData();
     }
 
     interface View extends BaseView {
@@ -55,6 +57,8 @@ public interface QualityContract {
         void returnGetUpLoadAfterChecked(HttpResponse httpResponse) throws JSONException;
 
         void returnGetFuzzySearchData(HttpResponse fuzzySearchData);
+
+        void returnRulerNumData(Integer data);
     }
 
     abstract class Presenter extends BasePresenter<View, Model> {
@@ -71,6 +75,8 @@ public interface QualityContract {
         public abstract void getUpLoadAfterCheckedRequest(String customer, String macAddress);
 
         public abstract void getFuzzySearchDataRequest(String name);
+
+        public abstract void getRulerNumDataRequest();
     }
 
 }
