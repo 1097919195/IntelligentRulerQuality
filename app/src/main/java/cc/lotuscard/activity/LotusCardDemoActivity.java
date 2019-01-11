@@ -317,7 +317,7 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
         // TODO: 2019/1/10 0010 之前这个蓝牙反正连这的时候不能发送指令了，或者发之前先断开，具体能尺子到了再看
         //发送完指令需要断开连接使修改生效
         change_name.setOnClickListener(v -> {
-            if(!AppConstant.UUID_WRITE.equals("")){//保证蓝牙已经连接
+            if(!AppConstant.UUID_STRING.equals("")){//保证蓝牙已经连接
                 mPresenter.getRulerNumDataRequest();//初始化返回当前尺子可用的编码（每次会加1）
                 if (isGetRulerNum) {//确保蓝牙编号存在
 //                String hexstring = strTo16(result);//字符串转化为16进制字符串
@@ -585,13 +585,10 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
         //蓝牙第二版（可写--改名）通过FastBle已知索引位置
             for (BluetoothGattCharacteristic characteristic : deviceServices.getBluetoothGattServices().get(3).getCharacteristics()) {
                 if ((characteristic.getProperties() & BluetoothGattCharacteristic.PROPERTY_WRITE) != 0) {
-                    // TODO: 2019/1/10 0010 能获取到二个的问题
-                    AppConstant.UUID_WRITE = characteristic.getUuid().toString();
-                    LogUtils.loge("uuid"+characteristic.getUuid().toString());
+                    // TODO: 2019/1/10 0010 不同蓝牙的服务和特性都是一样的通过FastBLE直接固定传入，不获取了
                 }
                 if (isCharacteristicNotifiable(characteristic)) {
                     AppConstant.UUID_STRING = characteristic.getUuid().toString();
-                    LogUtils.loge("uuid"+AppConstant.UUID_STRING);
                     ToastUtil.showShort("蓝牙配对成功，等待建立通信中...");
                     cirProgressBarWithChoose.dismiss();
                     mPresenter.startMeasureRequest(characteristic.getUuid());
