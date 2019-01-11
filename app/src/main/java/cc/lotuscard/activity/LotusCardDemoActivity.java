@@ -124,6 +124,7 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
     List<String> searchName = new ArrayList<>();
     boolean stopSearch = false;
     String result;//格式化尺子编号
+    boolean isGetRulerNum = false;
 
     @Override
     protected void onResume() {
@@ -316,71 +317,76 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
         // TODO: 2019/1/10 0010 之前这个蓝牙反正连这的时候不能发送指令了，或者发之前先断开，具体能尺子到了再看
         //发送完指令需要断开连接使修改生效
         change_name.setOnClickListener(v -> {
-            if(!AppConstant.UUID_STRING.equals("")){
+            if(!AppConstant.UUID_WRITE.equals("")){//保证蓝牙已经连接
                 mPresenter.getRulerNumDataRequest();//初始化返回当前尺子可用的编码（每次会加1）
+                if (isGetRulerNum) {//确保蓝牙编号存在
 //                String hexstring = strTo16(result);//字符串转化为16进制字符串
-                String checkCode1 = result.substring(0, 2);//注意substring是不包括结尾的索引的
-                String checkCode2 = result.substring(2, 4);
-                //校验码之和  不知道是不是要转化成十六进制的
+                    String checkCode1 = result.substring(0, 2);//注意substring是不包括结尾的索引的
+                    String checkCode2 = result.substring(2, 4);
+                    //校验码之和  不知道是不是要转化成十六进制的
 //                String checkCodeResult = strTo16(checkCode1)+strTo16(checkCode2);
-                int checkCodeResult = Integer.parseInt(checkCode1)+Integer.parseInt(checkCode2);
-                LogUtils.loge(checkCode1+"==="+checkCode2+"==="+checkCodeResult);
-                String instructions = "A0" + result + String.valueOf(checkCodeResult);//最终发送的指令 A0这个帧头是固定的
-                LogUtils.loge("instructions=="+instructions);
+                    int checkCodeResult = Integer.parseInt(checkCode1)+Integer.parseInt(checkCode2);
+                    LogUtils.loge(checkCode1+"==="+checkCode2+"==="+checkCodeResult);
+                    String instructions = "A0" + result + String.valueOf(checkCodeResult);//最终发送的指令 A0这个帧头是固定的
+                    LogUtils.loge("instructions=="+instructions);
 
-                CompositeDisposable disposable = new CompositeDisposable();
-                PublishSubject<Boolean> disconnectTriggerSubject = PublishSubject.create();
-                byte[] bytes = HexStringTwo.hexStringToBytes(instructions);//一个字节可表示为两个十六进制数字  A0 00 01 01
-                LogUtils.loge("length: "+bytes.length);
-                byte[] bytes1 = Arrays.copyOfRange(bytes, 0, 1);
-                byte[] bytes2 = Arrays.copyOfRange(bytes, 1, 2);
-                byte[] bytes3 = Arrays.copyOfRange(bytes, 2, 3);
-                byte[] bytes4 = Arrays.copyOfRange(bytes, 3, 4);
-                ArrayList<byte[]> arrayList = new ArrayList<>();
-                arrayList.add(bytes1);
-                arrayList.add(bytes2);
-                arrayList.add(bytes3);
-                arrayList.add(bytes4);
+                    CompositeDisposable disposable = new CompositeDisposable();
+                    PublishSubject<Boolean> disconnectTriggerSubject = PublishSubject.create();
+                    byte[] bytes = HexStringTwo.hexStringToBytes(instructions);//一个字节可表示为两个十六进制数字  A0 00 01 01
+                    LogUtils.loge("length: "+bytes.length);
+                    byte[] bytes1 = Arrays.copyOfRange(bytes, 0, 1);
+                    byte[] bytes2 = Arrays.copyOfRange(bytes, 1, 2);
+                    byte[] bytes3 = Arrays.copyOfRange(bytes, 2, 3);
+                    byte[] bytes4 = Arrays.copyOfRange(bytes, 3, 4);
+                    ArrayList<byte[]> arrayList = new ArrayList<>();
+                    arrayList.add(bytes1);
+                    arrayList.add(bytes2);
+                    arrayList.add(bytes3);
+                    arrayList.add(bytes4);
 
-                DisposableObserver<Long> disposableObserver = new DisposableObserver<Long>() {
-                    @Override
-                    public void onNext(Long l) {
-                        int i = l.intValue();
-                        if (i == arrayList.size()) {
-                            disposable.clear();
-                            LogUtils.loge("complete");
-                        } else {
-                            AppApplication.getRxBleClient(AppApplication.getAppContext()).getBleDevice(AppConstant.MAC_ADDRESS)
-                                    .establishConnection(false)
-                                    .takeUntil(disconnectTriggerSubject)
-                                    .flatMapSingle(rxBleConnection -> rxBleConnection.writeCharacteristic(UUID.fromString(AppConstant.UUID_WRITE), arrayList.get(i)))
+                    DisposableObserver<Long> disposableObserver = new DisposableObserver<Long>() {
+                        @Override
+                        public void onNext(Long l) {
+                            int i = l.intValue();
+                            if (i == arrayList.size()) {
+                                disposable.clear();
+                                LogUtils.loge("complete");
+                            } else {
+                                AppApplication.getRxBleClient(AppApplication.getAppContext()).getBleDevice(AppConstant.MAC_ADDRESS)
+                                        .establishConnection(false)
+                                        .takeUntil(disconnectTriggerSubject)
+                                        .flatMapSingle(rxBleConnection -> rxBleConnection.writeCharacteristic(UUID.fromString(AppConstant.UUID_WRITE), arrayList.get(i)))
 //                                    .firstElement()
-                                    .subscribe(
-                                            by ->
-                                            {
-                                                LogUtils.loge("write=======" + HexString.bytesToHex(by));
-                                                disconnectTriggerSubject.onNext(true);
-                                            }
-                                            , e -> LogUtils.loge(i + " times " + e.toString())
-                                    );
+                                        .subscribe(
+                                                by ->
+                                                {
+                                                    LogUtils.loge("write=======" + HexString.bytesToHex(by));
+                                                    disconnectTriggerSubject.onNext(true);
+                                                }
+                                                , e -> LogUtils.loge(i + " times " + e.toString())
+                                        );
+                            }
                         }
-                    }
 
-                    @Override
-                    public void onError(Throwable e) {
+                        @Override
+                        public void onError(Throwable e) {
 
-                    }
+                        }
 
-                    @Override
-                    public void onComplete() {
+                        @Override
+                        public void onComplete() {
 
-                    }
-                };
+                        }
+                    };
 
-                Observable.interval(0, 200, TimeUnit.MILLISECONDS)
-                        .compose(RxSchedulers.io_main())
-                        .subscribe(disposableObserver);
-                disposable.add(disposableObserver);
+                    Observable.interval(0, 200, TimeUnit.MILLISECONDS)
+                            .compose(RxSchedulers.io_main())
+                            .subscribe(disposableObserver);
+                    disposable.add(disposableObserver);
+                }else {
+                    ToastUtil.showShort("蓝牙编号获取失败，请重试");
+                }
+
             }else {
                 ToastUtil.showShort("当前UUID已为空，请重新连接智能尺");
             }
@@ -741,6 +747,7 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
 
     @Override
     public void returnRulerNumData(Integer data) {
+        isGetRulerNum = true;
         if (data < 10000) {//Integer类会自动拆箱i.intValue()
             result = String.format("%0" + 4 + "d", data);
             //将其转换为十六进制并输出
@@ -797,6 +804,10 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
             bleState.setImageResource(R.drawable.ble_disconnected);
             AppConstant.UUID_STRING= "";
             AppConstant.MAC_ADDRESS= "";
+        }
+        if (msg.equals("蓝牙编号获取失败")) {
+            isGetRulerNum = false;
+            mPresenter.getRulerNumDataRequest();//编号获取失败就直接跳过重新获取
         }
     }
 

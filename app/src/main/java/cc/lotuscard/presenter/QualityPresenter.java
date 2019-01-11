@@ -140,7 +140,7 @@ public class QualityPresenter extends QualityContract.Presenter {
         mRxManage.add(mModel.getRulerNumData()
                 .subscribe(
                         num -> mView.returnRulerNumData(num),
-                        e->{mView.showErrorTip(e.getMessage());}
+                        e->{mView.showErrorTip("蓝牙编号获取失败");}
                 ));
     }
 
