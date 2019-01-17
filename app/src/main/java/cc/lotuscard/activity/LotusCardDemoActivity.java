@@ -102,6 +102,8 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
     TextView macCounts;
     @BindView(R.id.change_name)
     Button change_name;
+    @BindView(R.id.disconnect_ble)
+    Button disconnect_ble;
     private CommonRecycleViewAdapter<QualityBleData> adapter;
     List<QualityBleData> qualityBleDataList = new ArrayList<>();
 
@@ -314,7 +316,6 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
 
         mPresenter.getRulerNumDataRequest();//初始化返回当前尺子可用的编码（每次会加1）
 
-        // TODO: 2019/1/10 0010 之前这个蓝牙反正连这的时候不能发送指令了，或者发之前先断开，具体能尺子到了再看
         //发送完指令需要断开连接使修改生效
         change_name.setOnClickListener(v -> {
             if(!AppConstant.UUID_STRING.equals("")){//保证蓝牙已经连接
@@ -339,10 +340,11 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
                     byte[] bytes3 = Arrays.copyOfRange(bytes, 2, 3);
                     byte[] bytes4 = Arrays.copyOfRange(bytes, 3, 4);
                     ArrayList<byte[]> arrayList = new ArrayList<>();
-                    arrayList.add(bytes1);
-                    arrayList.add(bytes2);
-                    arrayList.add(bytes3);
-                    arrayList.add(bytes4);
+                    arrayList.add(bytes);
+//                    arrayList.add(bytes1);
+//                    arrayList.add(bytes2);
+//                    arrayList.add(bytes3);
+//                    arrayList.add(bytes4);
 
                     DisposableObserver<Long> disposableObserver = new DisposableObserver<Long>() {
                         @Override
@@ -390,6 +392,10 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
             }else {
                 ToastUtil.showShort("当前UUID已为空，请重新连接智能尺");
             }
+
+        });
+
+        disconnect_ble.setOnClickListener(v -> {
 
         });
     }

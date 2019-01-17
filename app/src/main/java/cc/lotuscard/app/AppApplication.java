@@ -3,6 +3,7 @@ package cc.lotuscard.app;
 
 import android.content.Context;
 
+import com.clj.fastble.BleManager;
 import com.jaydenxiao.common.baseapp.BaseApplication;
 import com.jaydenxiao.common.commonutils.LogUtils;
 import com.polidea.rxandroidble2.RxBleClient;
@@ -29,6 +30,8 @@ public class AppApplication extends BaseApplication {
         rxBleClient = RxBleClient.create(this);
         setRxJavaErrorHandler();
         AppCrashHandler.getInstance().init(this);//捕捉异常
+
+        BleManager.getInstance().init(this);//FastBle初始化
     }
 
     public static RxBleClient getRxBleClient(Context context) {
