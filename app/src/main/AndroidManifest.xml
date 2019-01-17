@@ -39,7 +39,7 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
         <activity
-            android:name="cc.lotuscard.activity.LotusCardDemoActivity"
+            android:name="cc.lotuscard.activity.SignInActivity"
             android:launchMode="singleTop"
             android:alwaysRetainTaskState="true"
             android:windowSoftInputMode="stateAlwaysHidden"
@@ -53,14 +53,14 @@
             </intent-filter>
         </activity>
 
-        <!--<activity android:name="cc.lotuscard.activity.LotusCardDemoActivity"-->
-            <!--android:launchMode="singleTask"-->
-            <!--android:alwaysRetainTaskState="true"-->
-            <!--android:windowSoftInputMode="stateAlwaysHidden"-->
-            <!--android:screenOrientation="nosensor"-->
-            <!--android:configChanges="orientation|screenSize">-->
+        <activity android:name="cc.lotuscard.activity.LotusCardDemoActivity"
+            android:launchMode="singleTask"
+            android:alwaysRetainTaskState="true"
+            android:windowSoftInputMode="stateAlwaysHidden"
+            android:screenOrientation="nosensor"
+            android:configChanges="orientation|screenSize">
 
-        <!--</activity>-->
+        </activity>
 
     </application>
 
