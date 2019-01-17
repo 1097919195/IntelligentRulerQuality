@@ -2,8 +2,8 @@ package cc.lotuscard.activity;
 
 import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCharacteristic;
-import android.bluetooth.BluetoothGattService;
 import android.content.IntentFilter;
 import android.graphics.drawable.ColorDrawable;
 import android.support.annotation.NonNull;
@@ -19,8 +19,6 @@ import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
-import android.widget.LinearLayout;
-import android.widget.ListAdapter;
 import android.widget.TextView;
 
 import com.afollestad.materialdialogs.DialogAction;
@@ -30,6 +28,14 @@ import com.aspsine.irecyclerview.IRecyclerView;
 import com.aspsine.irecyclerview.universaladapter.ViewHolderHelper;
 import com.aspsine.irecyclerview.universaladapter.recyclerview.CommonRecycleViewAdapter;
 import com.aspsine.irecyclerview.universaladapter.recyclerview.OnItemClickListener;
+import com.clj.fastble.BleManager;
+import com.clj.fastble.callback.BleGattCallback;
+import com.clj.fastble.callback.BleNotifyCallback;
+import com.clj.fastble.callback.BleScanCallback;
+import com.clj.fastble.callback.BleWriteCallback;
+import com.clj.fastble.data.BleDevice;
+import com.clj.fastble.exception.BleException;
+import com.clj.fastble.scan.BleScanRuleConfig;
 import com.jakewharton.rxbinding2.widget.RxTextView;
 import com.jaydenxiao.common.base.BaseActivity;
 import com.jaydenxiao.common.base.BasePopupWindow;
@@ -60,7 +66,7 @@ import java.util.concurrent.TimeUnit;
 import butterknife.BindView;
 import cc.lotuscard.app.AppApplication;
 import cc.lotuscard.app.AppConstant;
-import cc.lotuscard.bean.BleDevice;
+import cc.lotuscard.bean.MyBleDevice;
 import cc.lotuscard.bean.HttpResponse;
 import cc.lotuscard.bean.QualityBleData;
 import cc.lotuscard.bean.QualityValueLength;
@@ -81,13 +87,13 @@ import io.reactivex.subjects.PublishSubject;
 public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,QualityModel> implements QualityContract.View{
 
     /*********************************** BLE *********************************/
-    private List<BleDevice> bleDeviceList = new ArrayList<>();
+    private List<MyBleDevice> myBleDeviceList = new ArrayList<>();
+    List<BleDevice> scanResultList = new ArrayList<>();
     private CommonRecycleViewAdapter<BleDevice> bleDeviceAdapter;
     private MaterialDialog scanResultDialog,cirProgressBarWithScan,cirProgressBarWithChoose;
     private List<String> rxBleDeviceAddressList = new ArrayList<>();
 
     /*********************************** UI *********************************/
-    private StartingUpBroadcast startingUpBroadcast;
     @BindView(R.id.bleState)
     ImageView bleState;
     @BindView(R.id.bleMacAddress)
@@ -127,6 +133,7 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
     boolean stopSearch = false;
     String result;//格式化尺子编号
     boolean isGetRulerNum = false;
+    int connectPostion = -1;
 
     @Override
     protected void onResume() {
@@ -143,21 +150,95 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
     }
 
     private void configureBleList() {
-        bleDeviceAdapter = new CommonRecycleViewAdapter<BleDevice>(this,R.layout.item_bledevice, bleDeviceList) {
+        bleDeviceAdapter = new CommonRecycleViewAdapter<BleDevice>(this,R.layout.item_bledevice, scanResultList) {
             @Override
-            public void convert(ViewHolderHelper helper, BleDevice bleDevice) {
+            public void convert(ViewHolderHelper helper, BleDevice myBleDevice) {
                 TextView text_name = helper.getView(R.id.text_name);
                 TextView text_mac = helper.getView(R.id.text_mac);
                 TextView text_rssi = helper.getView(R.id.text_rssi);
-                text_name.setText(bleDevice.getName());
-                text_mac.setText(bleDevice.getAddress());
-                text_rssi.setText(String.valueOf(bleDevice.getRssi()));
+                text_name.setText(myBleDevice.getName());
+                text_mac.setText(myBleDevice.getMac());
+                text_rssi.setText(String.valueOf(myBleDevice.getRssi()));
 
                 helper.itemView.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
                         //连接蓝牙
-                        mPresenter.chooseDeviceConnectRequest(text_mac.getText().toString());
+//                        mPresenter.chooseDeviceConnectRequest(text_mac.getText().toString());
+                        connectPostion = helper.getAdapterPosition();
+                        LogUtils.loge("connectPostion=="+connectPostion);
+                        BleManager.getInstance().cancelScan();//停止扫描
+                        BleManager.getInstance().connect(text_mac.getText().toString(), new BleGattCallback() {
+                            @Override
+                            public void onStartConnect() {
+                                cirProgressBarWithChoose.show();
+                            }
+
+                            @Override
+                            public void onConnectFail(BleDevice bleDevice, BleException exception) {
+                                bleState.setImageResource(R.drawable.ble_disconnected);
+                                cirProgressBarWithChoose.dismiss();
+                                bleMacAddress.setText("");
+                                ToastUtil.showShort("蓝牙连接失败");
+                                AppConstant.MAC_ADDRESS = "";
+                                bleBattery.setText("");
+                            }
+
+
+                            @Override
+                            public void onConnectSuccess(BleDevice bleDevice, BluetoothGatt gatt, int status) {
+                                AppConstant.MAC_ADDRESS = bleDevice.getMac();
+                                bleState.setImageResource(R.drawable.ble_connected);
+                                bleMacAddress.setText(AppConstant.MAC_ADDRESS);
+                                cirProgressBarWithChoose.dismiss();
+                                ToastUtil.showShort("连接成功");
+                                BleManager.getInstance().notify(
+                                        bleDevice,
+                                        AppConstant.UUID_SERVER,
+                                        AppConstant.UUID_STRING,
+                                        new BleNotifyCallback() {
+                                            @Override
+                                            public void onNotifySuccess() {
+                                                ToastUtil.showShort("通知连接成功");
+                                                // 打开通知操作成功
+                                            }
+
+                                            @Override
+                                            public void onNotifyFailure(BleException exception) {
+                                                bleMacAddress.setText("");
+                                                ToastUtil.showShort("通知连接失败");
+                                                // 打开通知操作失败
+                                            }
+
+                                            @Override
+                                            public void onCharacteristicChanged(byte[] data) {
+                                                // 打开通知后，设备发过来的数据将在这里出现
+                                                String s = HexString.bytesToHex(data);
+                                                if (s.length() == AppConstant.STANDARD_LENGTH) {
+                                                    int code = Integer.parseInt("8D6A", 16);
+                                                    int length = Integer.parseInt(s.substring(0, 4), 16);
+                                                    int angle = Integer.parseInt(s.substring(4, 8), 16);
+                                                    int battery = Integer.parseInt(s.substring(8, 12), 16);
+                                                    int a1 = length ^ code;
+                                                    int a2 = angle ^ code;
+                                                    int a3 = battery ^ code;
+                                                    a1 += AppConstant.ADJUST_VALUE;
+                                                    returnStartMeasure(Float.valueOf(a1) / 10, Float.valueOf(a2) / 10, a3);
+                                                }
+                                            }
+                                        });
+                            }
+
+                            @Override
+                            public void onDisConnected(boolean isActiveDisConnected, BleDevice bleDevice, BluetoothGatt gatt, int status) {
+                                bleState.setImageResource(R.drawable.ble_disconnected);
+                                cirProgressBarWithChoose.dismiss();
+                                bleMacAddress.setText("");
+                                ToastUtil.showShort("蓝牙连接断开");
+                                AppConstant.MAC_ADDRESS = "";
+                                bleBattery.setText("");
+                            }
+                        });
                         if (scanResultDialog != null) {
                             scanResultDialog.dismiss();
                         }
@@ -206,22 +287,51 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
             rxPermissions.requestEach(Manifest.permission.ACCESS_COARSE_LOCATION)
                     .subscribe(permission -> { // will emit 2 Permission objects
                         if (permission.granted) {
-                            // FIXME: 2018/4/10 0010 需检测当前位置有没有开启
                             cirProgressBarWithScan.show();
-                            Timer timer = new Timer();
-                            timer = new Timer(true);
-                            timer.schedule(new TimerTask() {
+                            BleScanRuleConfig scanRuleConfig = new BleScanRuleConfig.Builder()
+//                                    .setServiceUuids(serviceUuids)      // 只扫描指定的服务的设备，可选
+//                                    .setDeviceName(true, names)         // 只扫描指定广播名的设备，可选
+//                                    .setDeviceMac(mac)                  // 只扫描指定mac的设备，可选
+//                                    .setAutoConnect(isAutoConnect)      // 连接时的autoConnect参数，可选，默认false
+                                    .setScanTimeOut(50000)              // 扫描超时时间，可选，默认10秒
+                                    .build();
+                            BleManager.getInstance().initScanRule(scanRuleConfig);
+
+                            rxBleDeviceAddressList.clear();
+                            myBleDeviceList.clear();
+                            scanResultList.clear();
+//                            mPresenter.getBleDeviceDataRequest();
+                            BleManager.getInstance().scan(new BleScanCallback() {
                                 @Override
-                                public void run() {
-                                    if (cirProgressBarWithScan.isShowing()){
-                                        cirProgressBarWithScan.dismiss();
-                                        RxBus2.getInstance().post(AppConstant.NO_BLE_FIND,true);
+                                public void onScanStarted(boolean success) {
+                                    scanResultDialog.show();
+                                }
+
+                                @Override
+                                public void onLeScan(BleDevice bleDevice) {
+                                    super.onLeScan(bleDevice);
+                                    if (bleDevice != null) {
+                                        if (!rxBleDeviceAddressList.contains(bleDevice.getMac())&& bleDevice.getName()!=null && !bleDevice.getName().equals("")) {//避免重复添加设备
+                                            rxBleDeviceAddressList.add(bleDevice.getMac());
+                                            scanResultList.add(bleDevice);
+                                            bleDeviceAdapter.notifyDataSetChanged();
+                                        }
+
+                                        if (rxBleDeviceAddressList.size() != 0 && cirProgressBarWithScan.isShowing()) {
+                                            cirProgressBarWithScan.dismiss();
+                                        }
                                     }
                                 }
-                            }, 6000);
-                            rxBleDeviceAddressList.clear();
-                            bleDeviceList.clear();
-                            mPresenter.getBleDeviceDataRequest();
+
+                                @Override
+                                public void onScanning(BleDevice bleDevice) {
+                                }
+
+                                @Override
+                                public void onScanFinished(List<BleDevice> scanResult) {
+//                                    ToastUtil.showShort("本次扫描结束");
+                                }
+                            });
 
                         } else if (permission.shouldShowRequestPermissionRationale) {
                             // Denied permission without ask never again
@@ -245,13 +355,11 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
     @Override
     public void initView() {
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);// 设置全屏
-        StartingUpBroadcastRecive();
         pop = LayoutInflater.from(this).inflate(R.layout.pop_fuzzysearch, null);
         ircSearch = pop.findViewById(R.id.searchList);
 
         initRcycleAdapter();
         itemClickRemeasure();
-        initRxBus2FindBle();
         initListener();
         initSearchAdapter();
     }
@@ -318,7 +426,7 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
 
         //发送完指令需要断开连接使修改生效
         change_name.setOnClickListener(v -> {
-            if(!AppConstant.UUID_STRING.equals("")){//保证蓝牙已经连接
+            if(!AppConstant.MAC_ADDRESS.equals("")){//保证蓝牙已经连接
                 mPresenter.getRulerNumDataRequest();//初始化返回当前尺子可用的编码（每次会加1）
                 if (isGetRulerNum) {//确保蓝牙编号存在
 //                String hexstring = strTo16(result);//字符串转化为16进制字符串
@@ -335,56 +443,58 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
                     PublishSubject<Boolean> disconnectTriggerSubject = PublishSubject.create();
                     byte[] bytes = HexStringTwo.hexStringToBytes(instructions);//一个字节可表示为两个十六进制数字  A0 00 01 01
                     LogUtils.loge("length: "+bytes.length);
-                    byte[] bytes1 = Arrays.copyOfRange(bytes, 0, 1);
-                    byte[] bytes2 = Arrays.copyOfRange(bytes, 1, 2);
-                    byte[] bytes3 = Arrays.copyOfRange(bytes, 2, 3);
-                    byte[] bytes4 = Arrays.copyOfRange(bytes, 3, 4);
-                    ArrayList<byte[]> arrayList = new ArrayList<>();
-                    arrayList.add(bytes);
-//                    arrayList.add(bytes1);
-//                    arrayList.add(bytes2);
-//                    arrayList.add(bytes3);
-//                    arrayList.add(bytes4);
 
-                    DisposableObserver<Long> disposableObserver = new DisposableObserver<Long>() {
-                        @Override
-                        public void onNext(Long l) {
-                            int i = l.intValue();
-                            if (i == arrayList.size()) {
-                                disposable.clear();
-                                LogUtils.loge("complete");
-                            } else {
-                                AppApplication.getRxBleClient(AppApplication.getAppContext()).getBleDevice(AppConstant.MAC_ADDRESS)
-                                        .establishConnection(false)
-                                        .takeUntil(disconnectTriggerSubject)
-                                        .flatMapSingle(rxBleConnection -> rxBleConnection.writeCharacteristic(UUID.fromString(AppConstant.UUID_WRITE), arrayList.get(i)))
-//                                    .firstElement()
-                                        .subscribe(
-                                                by ->
-                                                {
-                                                    LogUtils.loge("write=======" + HexString.bytesToHex(by));
-                                                    disconnectTriggerSubject.onNext(true);
-                                                }
-                                                , e -> LogUtils.loge(i + " times " + e.toString())
-                                        );
-                            }
-                        }
-
-                        @Override
-                        public void onError(Throwable e) {
-
-                        }
-
-                        @Override
-                        public void onComplete() {
-
-                        }
-                    };
-
-                    Observable.interval(0, 200, TimeUnit.MILLISECONDS)
-                            .compose(RxSchedulers.io_main())
-                            .subscribe(disposableObserver);
-                    disposable.add(disposableObserver);
+                    writeBleName(bytes);
+//                    byte[] bytes1 = Arrays.copyOfRange(bytes, 0, 1);
+//                    byte[] bytes2 = Arrays.copyOfRange(bytes, 1, 2);
+//                    byte[] bytes3 = Arrays.copyOfRange(bytes, 2, 3);
+//                    byte[] bytes4 = Arrays.copyOfRange(bytes, 3, 4);
+//                    ArrayList<byte[]> arrayList = new ArrayList<>();
+//                    arrayList.add(bytes);
+////                    arrayList.add(bytes1);
+////                    arrayList.add(bytes2);
+////                    arrayList.add(bytes3);
+////                    arrayList.add(bytes4);
+//
+//                    DisposableObserver<Long> disposableObserver = new DisposableObserver<Long>() {
+//                        @Override
+//                        public void onNext(Long l) {
+//                            int i = l.intValue();
+//                            if (i == arrayList.size()) {
+//                                disposable.clear();
+//                                LogUtils.loge("complete");
+//                            } else {
+//                                AppApplication.getRxBleClient(AppApplication.getAppContext()).getBleDevice(AppConstant.MAC_ADDRESS)
+//                                        .establishConnection(false)
+//                                        .takeUntil(disconnectTriggerSubject)
+//                                        .flatMapSingle(rxBleConnection -> rxBleConnection.writeCharacteristic(UUID.fromString(AppConstant.UUID_WRITE), arrayList.get(i)))
+////                                    .firstElement()
+//                                        .subscribe(
+//                                                by ->
+//                                                {
+//                                                    LogUtils.loge("write=======" + HexString.bytesToHex(by));
+//                                                    disconnectTriggerSubject.onNext(true);
+//                                                }
+//                                                , e -> LogUtils.loge(i + " times " + e.toString())
+//                                        );
+//                            }
+//                        }
+//
+//                        @Override
+//                        public void onError(Throwable e) {
+//
+//                        }
+//
+//                        @Override
+//                        public void onComplete() {
+//
+//                        }
+//                    };
+//
+//                    Observable.interval(0, 200, TimeUnit.MILLISECONDS)
+//                            .compose(RxSchedulers.io_main())
+//                            .subscribe(disposableObserver);
+//                    disposable.add(disposableObserver);
                 }else {
                     ToastUtil.showShort("蓝牙编号获取失败，请重试");
                 }
@@ -396,8 +506,34 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
         });
 
         disconnect_ble.setOnClickListener(v -> {
-
+            if (scanResultList.size() > 0) {
+                if (BleManager.getInstance().isConnected(scanResultList.get(connectPostion))) {
+                BleManager.getInstance().disconnect(scanResultList.get(connectPostion));
+                }
+            }
         });
+    }
+
+    //蓝牙改名
+    private void writeBleName(byte[] data) {
+        BleManager.getInstance().write(
+                scanResultList.get(connectPostion),
+                AppConstant.UUID_SERVER,
+                AppConstant.UUID_WRITE,
+                data,
+                new BleWriteCallback() {
+                    @Override
+                    public void onWriteSuccess(int current, int total, byte[] justWrite) {
+                        ToastUtil.showShort("写入成功了，请断开蓝牙");
+                        // 发送数据到设备成功（分包发送的情况下，可以通过方法中返回的参数可以查看发送进度）
+                    }
+
+                    @Override
+                    public void onWriteFailure(BleException exception) {
+                        ToastUtil.showShort("写入失败，请重试");
+                        // 发送数据到设备失败
+                    }
+                });
     }
 
     private void itemClickRemeasure() {
@@ -515,24 +651,6 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
         irc.setLayoutManager(new StaggeredGridLayoutManager(1,StaggeredGridLayoutManager.VERTICAL));
     }
 
-    private void initRxBus2FindBle() {
-        //监听是否发现附近蓝牙
-        mRxManager.on(AppConstant.NO_BLE_FIND, new Consumer<Boolean>() {
-            @Override
-            public void accept(Boolean isChecked) throws Exception {
-                if (isChecked) {
-                    ToastUtil.showShort("附近没有可见设备！请重试");
-                }
-            }
-        });
-    }
-
-    public void StartingUpBroadcastRecive() {
-        IntentFilter intentFilter = new IntentFilter();
-        intentFilter.addAction("android.intent.action.BOOT_COMPLETED");
-        startingUpBroadcast = new StartingUpBroadcast();
-        registerReceiver(startingUpBroadcast, intentFilter);
-    }
 
     //获取需要测试的长度
     @Override
@@ -556,7 +674,7 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
             RxBleDevice device = scanResult.getBleDevice();
             if (!rxBleDeviceAddressList.contains(device.getMacAddress())) {//避免重复添加设备
                 rxBleDeviceAddressList.add(device.getMacAddress());
-                bleDeviceList.add(new BleDevice(device.getName(), device.getMacAddress(), scanResult.getRssi()));
+                myBleDeviceList.add(new MyBleDevice(device.getName(), device.getMacAddress(), scanResult.getRssi()));
                 bleDeviceAdapter.notifyDataSetChanged();
             }
 
@@ -594,7 +712,6 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
                     // TODO: 2019/1/10 0010 不同蓝牙的服务和特性都是一样的通过FastBLE直接固定传入，不获取了
                 }
                 if (isCharacteristicNotifiable(characteristic)) {
-                    AppConstant.UUID_STRING = characteristic.getUuid().toString();
                     ToastUtil.showShort("蓝牙配对成功，等待建立通信中...");
                     cirProgressBarWithChoose.dismiss();
                     mPresenter.startMeasureRequest(characteristic.getUuid());
@@ -802,23 +919,9 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
     public void showErrorTip(String msg) {
         ToastUtil.showShort(msg);
         //蓝牙连接失败
-        if(msg=="connectFail"){
-            cirProgressBarWithChoose.dismiss();
-            bleState.setImageResource(R.drawable.ble_disconnected);
-            AppConstant.UUID_STRING= "";
-            AppConstant.MAC_ADDRESS= "";
-        }
         if (msg.equals("蓝牙编号获取失败")) {
             isGetRulerNum = false;
             mPresenter.getRulerNumDataRequest();//编号获取失败就直接跳过重新获取
-        }
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        if (startingUpBroadcast != null) {
-            unregisterReceiver(startingUpBroadcast);
         }
     }
 }

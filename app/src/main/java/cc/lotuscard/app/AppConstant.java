@@ -12,8 +12,10 @@ public class AppConstant {
 
     public static final int STANDARD_LENGTH = 16;
     public static final int ADJUST_VALUE = 14;
-    public static String UUID_STRING="";
+    public static final String UUID_SERVER="0000fff0-0000-1000-8000-00805f9b34fb";
+    public static final String UUID_STRING="0000fff4-0000-1000-8000-00805f9b34fb";
     public static final String UUID_WRITE="0000fff1-0000-1000-8000-00805f9b34fb";
+
     public static String MAC_ADDRESS="";
     public static final String CONNECT_SUCCEED="CONNECT_SUCCEED";
     public static final String NO_BLE_FIND="NO_BLE_FIND";
