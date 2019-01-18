@@ -87,11 +87,11 @@ import io.reactivex.subjects.PublishSubject;
 public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,QualityModel> implements QualityContract.View{
 
     /*********************************** BLE *********************************/
-    private List<MyBleDevice> myBleDeviceList = new ArrayList<>();
+    private List<MyBleDevice> myBleDeviceList = new ArrayList<>();//RxAndroidBle中的
     List<BleDevice> scanResultList = new ArrayList<>();
     private CommonRecycleViewAdapter<BleDevice> bleDeviceAdapter;
     private MaterialDialog scanResultDialog,cirProgressBarWithScan,cirProgressBarWithChoose;
-    private List<String> rxBleDeviceAddressList = new ArrayList<>();
+    private List<String> rxBleDeviceAddressList = new ArrayList<>();//避免重复添加设备
 
     /*********************************** UI *********************************/
     @BindView(R.id.bleState)
@@ -150,6 +150,16 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
     }
 
     private void configureBleList() {
+        //蓝牙默认扫描配置
+        BleScanRuleConfig scanRuleConfig = new BleScanRuleConfig.Builder()
+//                                    .setServiceUuids(serviceUuids)      // 只扫描指定的服务的设备，可选
+//                                    .setDeviceName(true, names)         // 只扫描指定广播名的设备，可选
+//                                    .setDeviceMac(mac)                  // 只扫描指定mac的设备，可选
+//                                    .setAutoConnect(isAutoConnect)      // 连接时的autoConnect参数，可选，默认false
+                .setScanTimeOut(50000)              // 扫描超时时间，可选，默认10秒
+                .build();
+        BleManager.getInstance().initScanRule(scanRuleConfig);
+
         bleDeviceAdapter = new CommonRecycleViewAdapter<BleDevice>(this,R.layout.item_bledevice, scanResultList) {
             @Override
             public void convert(ViewHolderHelper helper, BleDevice myBleDevice) {
@@ -165,7 +175,7 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
                     public void onClick(View v) {
                         //连接蓝牙
 //                        mPresenter.chooseDeviceConnectRequest(text_mac.getText().toString());
-                        connectPostion = helper.getAdapterPosition();
+                        connectPostion = helper.getAdapterPosition();//记录索引等下获取对应的BleDevice
                         LogUtils.loge("connectPostion=="+connectPostion);
                         BleManager.getInstance().cancelScan();//停止扫描
                         BleManager.getInstance().connect(text_mac.getText().toString(), new BleGattCallback() {
@@ -184,7 +194,6 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
                                 bleBattery.setText("");
                             }
 
-
                             @Override
                             public void onConnectSuccess(BleDevice bleDevice, BluetoothGatt gatt, int status) {
                                 AppConstant.MAC_ADDRESS = bleDevice.getMac();
@@ -192,7 +201,7 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
                                 bleMacAddress.setText(AppConstant.MAC_ADDRESS);
                                 cirProgressBarWithChoose.dismiss();
                                 ToastUtil.showShort("连接成功");
-                                BleManager.getInstance().notify(
+                                BleManager.getInstance().notify(//连接后 获取通知特性
                                         bleDevice,
                                         AppConstant.UUID_SERVER,
                                         AppConstant.UUID_STRING,
@@ -288,14 +297,6 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
                     .subscribe(permission -> { // will emit 2 Permission objects
                         if (permission.granted) {
                             cirProgressBarWithScan.show();
-                            BleScanRuleConfig scanRuleConfig = new BleScanRuleConfig.Builder()
-//                                    .setServiceUuids(serviceUuids)      // 只扫描指定的服务的设备，可选
-//                                    .setDeviceName(true, names)         // 只扫描指定广播名的设备，可选
-//                                    .setDeviceMac(mac)                  // 只扫描指定mac的设备，可选
-//                                    .setAutoConnect(isAutoConnect)      // 连接时的autoConnect参数，可选，默认false
-                                    .setScanTimeOut(50000)              // 扫描超时时间，可选，默认10秒
-                                    .build();
-                            BleManager.getInstance().initScanRule(scanRuleConfig);
 
                             rxBleDeviceAddressList.clear();
                             myBleDeviceList.clear();
@@ -500,7 +501,7 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
                 }
 
             }else {
-                ToastUtil.showShort("当前UUID已为空，请重新连接智能尺");
+                ToastUtil.showShort("当前UUID已为空，先连接智能尺");
             }
 
         });
@@ -572,7 +573,7 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
     }
 
     private void initRcycleAdapter() {
-        mPresenter.getQualityDataRequest();
+        mPresenter.getQualityDataRequest();//先获取需要测量的具体数据
         adapter = new CommonRecycleViewAdapter<QualityBleData>(this, R.layout.item_quality, qualityBleDataList) {
             @Override
             public void convert(ViewHolderHelper helper, QualityBleData qualityBleData) {
@@ -651,7 +652,6 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
         irc.setLayoutManager(new StaggeredGridLayoutManager(1,StaggeredGridLayoutManager.VERTICAL));
     }
 
-
     //获取需要测试的长度
     @Override
     public void returnGetQualityData(List<QualityValueLength> qualityValueLength) {
@@ -706,7 +706,7 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
 //                }
 //            }
 //        }
-        //蓝牙第二版（可写--改名）通过FastBle已知索引位置
+        //蓝牙第二版（可写--改名）通过FastBle查看到特性的值
             for (BluetoothGattCharacteristic characteristic : deviceServices.getBluetoothGattServices().get(3).getCharacteristics()) {
                 if ((characteristic.getProperties() & BluetoothGattCharacteristic.PROPERTY_WRITE) != 0) {
                     // TODO: 2019/1/10 0010 不同蓝牙的服务和特性都是一样的通过FastBLE直接固定传入，不获取了
@@ -840,6 +840,7 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
         }
     }
 
+    //客户的模糊查询返回
     @Override
     public void returnGetFuzzySearchData(HttpResponse fuzzySearchData) {
         searchName.clear();
@@ -907,7 +908,6 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
         if (title=="chooseConnect") {
             cirProgressBarWithChoose.show();
         }
-
     }
 
     @Override
