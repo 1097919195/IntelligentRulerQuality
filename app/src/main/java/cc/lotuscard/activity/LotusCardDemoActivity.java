@@ -131,7 +131,7 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
     IRecyclerView ircSearch;
     List<String> searchName = new ArrayList<>();
     boolean stopSearch = false;
-    String result;//格式化尺子编号
+    String result = "";//格式化尺子编号
     boolean isGetRulerNum = false;
     int connectPostion = -1;
 
@@ -429,15 +429,20 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
         change_name.setOnClickListener(v -> {
             if(!AppConstant.MAC_ADDRESS.equals("")){//保证蓝牙已经连接
                 mPresenter.getRulerNumDataRequest();//初始化返回当前尺子可用的编码（每次会加1）
-                if (isGetRulerNum) {//确保蓝牙编号存在
-//                String hexstring = strTo16(result);//字符串转化为16进制字符串
+                if (isGetRulerNum && !result.equals("")) {//确保蓝牙编号存在
                     String checkCode1 = result.substring(0, 2);//注意substring是不包括结尾的索引的
                     String checkCode2 = result.substring(2, 4);
-                    //校验码之和  不知道是不是要转化成十六进制的
-//                String checkCodeResult = strTo16(checkCode1)+strTo16(checkCode2);
-                    int checkCodeResult = Integer.parseInt(checkCode1)+Integer.parseInt(checkCode2);
+                    //把二个十六进制转化成long相加 来获取校验码
+                    long x = Long.parseLong(checkCode1, 16);
+                    long y = Long.parseLong(checkCode2, 16);
+                    String checkCodeResult = Long.toHexString(x+y);
                     LogUtils.loge(checkCode1+"==="+checkCode2+"==="+checkCodeResult);
-                    String instructions = "A0" + result + String.valueOf(checkCodeResult);//最终发送的指令 A0这个帧头是固定的
+                    if (checkCodeResult.length() > 2) {//确保校验码长度小于2
+                        ToastUtil.showShort("校验码长度过长,写入失败");
+                        mPresenter.getRulerNumDataRequest();
+                        return;
+                    }
+                    String instructions = "A0" + result + checkCodeResult;//最终发送的指令 A0这个帧头是固定的
                     LogUtils.loge("instructions=="+instructions);
 
                     CompositeDisposable disposable = new CompositeDisposable();
@@ -867,28 +872,19 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
     }
 
     @Override
-    public void returnRulerNumData(Integer data) {
+    public void returnRulerNumData(Integer data) {//65535转化的十六进制是ffff,再大就会超过4位数
         isGetRulerNum = true;
-        if (data < 10000) {//Integer类会自动拆箱i.intValue()
-            result = String.format("%0" + 4 + "d", data);
-            //将其转换为十六进制并输出
-            LogUtils.loge("ruler_num"+data);
-            LogUtils.loge("ruler_num"+result);
+        LogUtils.loge("ruler_num"+data);
+        String strHex = Integer.toHexString(data);//将其转换为十六进制
+        LogUtils.loge("ruler_num_hex"+strHex);
+        if (strHex.length() < 5) {
+            strHex = String.format("%4s", Integer.toHexString(data)).replace(' ', '0');//确保位4位数
+            result = strHex;
         }else {
-            ToastUtil.showShort("服务器返回结果超过四位数，无法操作，请处理数据库编号");
+            ToastUtil.showShort("服务器编号转化的字节长度过长,请删除数据库的编号重新开始");
+            result = "";
         }
-
-    }
-
-    //字符串转化成为16进制字符串
-    public static String strTo16(String s) {
-        String str = "";
-        for (int i = 0; i < s.length(); i++) {
-            int ch = (int) s.charAt(i);
-            String s4 = Integer.toHexString(ch);
-            str = str + s4;
-        }
-        return str;
+        LogUtils.loge("ruler_num_result"+result);
     }
 
     private void showPopupWindow() {
