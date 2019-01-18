@@ -84,13 +84,13 @@ import io.reactivex.observers.DisposableObserver;
 import io.reactivex.subjects.PublishSubject;
 
 
-public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,QualityModel> implements QualityContract.View{
+public class LotusCardDemoActivity extends BaseActivity<QualityPresenter, QualityModel> implements QualityContract.View {
 
     /*********************************** BLE *********************************/
     private List<MyBleDevice> myBleDeviceList = new ArrayList<>();//RxAndroidBle中的
     List<BleDevice> scanResultList = new ArrayList<>();
     private CommonRecycleViewAdapter<BleDevice> bleDeviceAdapter;
-    private MaterialDialog scanResultDialog,cirProgressBarWithScan,cirProgressBarWithChoose;
+    private MaterialDialog scanResultDialog, cirProgressBarWithScan, cirProgressBarWithChoose;
     private List<String> rxBleDeviceAddressList = new ArrayList<>();//避免重复添加设备
 
     /*********************************** UI *********************************/
@@ -114,8 +114,8 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
     List<QualityBleData> qualityBleDataList = new ArrayList<>();
 
     List<QualityValueLength> qualityValueLengths = new ArrayList<>();
-    int unMeasuredCounts=0;
-    int measuredCounts=0;
+    int unMeasuredCounts = 0;
+    int measuredCounts = 0;
     int itemPostion = 0;
     int itemPostionAgo = 0;
     boolean remuasure = false;
@@ -133,6 +133,7 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
     boolean stopSearch = false;
     String result = "";//格式化尺子编号
     boolean isGetRulerNum = false;
+    boolean isFirstScanAdd = true;
     int connectPostion = -1;
 
     @Override
@@ -144,8 +145,8 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
     }
 
     private void initBleStateListener() {
-        bleState.setOnClickListener(v ->  {
-                scanAndConnectBle();
+        bleState.setOnClickListener(v -> {
+            scanAndConnectBle();
         });
     }
 
@@ -160,7 +161,7 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
                 .build();
         BleManager.getInstance().initScanRule(scanRuleConfig);
 
-        bleDeviceAdapter = new CommonRecycleViewAdapter<BleDevice>(this,R.layout.item_bledevice, scanResultList) {
+        bleDeviceAdapter = new CommonRecycleViewAdapter<BleDevice>(this, R.layout.item_bledevice, scanResultList) {
             @Override
             public void convert(ViewHolderHelper helper, BleDevice myBleDevice) {
                 TextView text_name = helper.getView(R.id.text_name);
@@ -176,7 +177,7 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
                         //连接蓝牙
 //                        mPresenter.chooseDeviceConnectRequest(text_mac.getText().toString());
                         connectPostion = helper.getAdapterPosition();//记录索引等下获取对应的BleDevice
-                        LogUtils.loge("connectPostion=="+connectPostion);
+                        LogUtils.loge("connectPostion==" + connectPostion);
                         BleManager.getInstance().cancelScan();//停止扫描
                         BleManager.getInstance().connect(text_mac.getText().toString(), new BleGattCallback() {
                             @Override
@@ -296,7 +297,6 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
             rxPermissions.requestEach(Manifest.permission.ACCESS_COARSE_LOCATION)
                     .subscribe(permission -> { // will emit 2 Permission objects
                         if (permission.granted) {
-                            cirProgressBarWithScan.show();
 
                             rxBleDeviceAddressList.clear();
                             myBleDeviceList.clear();
@@ -305,22 +305,26 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
                             BleManager.getInstance().scan(new BleScanCallback() {
                                 @Override
                                 public void onScanStarted(boolean success) {
-                                    scanResultDialog.show();
+                                    cirProgressBarWithScan.show();
+                                    isFirstScanAdd = true;
                                 }
 
                                 @Override
                                 public void onLeScan(BleDevice bleDevice) {
                                     super.onLeScan(bleDevice);
                                     if (bleDevice != null) {
-                                        if (!rxBleDeviceAddressList.contains(bleDevice.getMac())&& bleDevice.getName()!=null && !bleDevice.getName().equals("")) {//避免重复添加设备
+                                        if (!rxBleDeviceAddressList.contains(bleDevice.getMac()) && bleDevice.getName() != null && !bleDevice.getName().equals("")) {//避免重复添加设备到列表适配器
                                             rxBleDeviceAddressList.add(bleDevice.getMac());
                                             scanResultList.add(bleDevice);
                                             bleDeviceAdapter.notifyDataSetChanged();
                                         }
 
-                                        if (rxBleDeviceAddressList.size() != 0 && cirProgressBarWithScan.isShowing()) {
+                                        if (isFirstScanAdd && rxBleDeviceAddressList.size() > 0) {//初次扫描才加载一次
                                             cirProgressBarWithScan.dismiss();
+                                            scanResultDialog.show();
+                                            isFirstScanAdd = false;
                                         }
+
                                     }
                                 }
 
@@ -330,7 +334,10 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
 
                                 @Override
                                 public void onScanFinished(List<BleDevice> scanResult) {
-//                                    ToastUtil.showShort("本次扫描结束");
+                                    if (rxBleDeviceAddressList.size() == 0) {
+                                        cirProgressBarWithScan.dismiss();
+                                        ToastUtil.showShort("本次扫描没有获取到蓝牙设备，请重试");
+                                    }
                                 }
                             });
 
@@ -350,7 +357,7 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
 
     @Override
     public void initPresenter() {
-        mPresenter.setVM(this,mModel);
+        mPresenter.setVM(this, mModel);
     }
 
     @Override
@@ -366,7 +373,7 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
     }
 
     private void initSearchAdapter() {
-        searchAdapter= new CommonRecycleViewAdapter<String>(this,R.layout.item_customer,searchName) {
+        searchAdapter = new CommonRecycleViewAdapter<String>(this, R.layout.item_customer, searchName) {
             @Override
             public void convert(ViewHolderHelper helper, String names) {
                 TextView customer = helper.getView(R.id.customerName);
@@ -376,16 +383,16 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
 
         //popupwindow
         ircSearch.setAdapter(searchAdapter);
-        ircSearch.setLayoutManager(new StaggeredGridLayoutManager(1,StaggeredGridLayoutManager.VERTICAL));
+        ircSearch.setLayoutManager(new StaggeredGridLayoutManager(1, StaggeredGridLayoutManager.VERTICAL));
         //framlayout
         ircWithSearch.setAdapter(searchAdapter);
-        ircWithSearch.setLayoutManager(new StaggeredGridLayoutManager(1,StaggeredGridLayoutManager.VERTICAL));
+        ircWithSearch.setLayoutManager(new StaggeredGridLayoutManager(1, StaggeredGridLayoutManager.VERTICAL));
 
         //设置分割线
 //        ircWithSearch.addItemDecoration(new DividerItemDecoration(this,DividerItemDecoration.VERTICAL_LIST));//默认
         //添加自定义分割线
-        DividerItemDecoration divider = new DividerItemDecoration(this,DividerItemDecoration.VERTICAL);//这里导入的包和自己封装的库不同
-        divider.setDrawable(ContextCompat.getDrawable(this,R.drawable.custom_divider));
+        DividerItemDecoration divider = new DividerItemDecoration(this, DividerItemDecoration.VERTICAL);//这里导入的包和自己封装的库不同
+        divider.setDrawable(ContextCompat.getDrawable(this, R.drawable.custom_divider));
         ircWithSearch.addItemDecoration(divider);
 
 
@@ -396,6 +403,7 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
                 customer.setText(searchName.get(position));
                 stopSearch = true;
             }
+
             @Override
             public boolean onItemLongClick(ViewGroup parent, View view, Object o, int position) {
                 return false;
@@ -406,7 +414,7 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
 
     private void initListener() {
         RxTextView.textChanges(customer)
-                .debounce( 600 , TimeUnit.MILLISECONDS )
+                .debounce(600, TimeUnit.MILLISECONDS)
                 .subscribe(new Consumer<Object>() {
                     @Override
                     public void accept(Object o) throws Exception {
@@ -421,13 +429,15 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
                     }
                 });
 
-        customer.setOnClickListener(v->{stopSearch = false;});
+        customer.setOnClickListener(v -> {
+            stopSearch = false;
+        });
 
         mPresenter.getRulerNumDataRequest();//初始化返回当前尺子可用的编码（每次会加1）
 
         //发送完指令需要断开连接使修改生效
         change_name.setOnClickListener(v -> {
-            if(!AppConstant.MAC_ADDRESS.equals("")){//保证蓝牙已经连接
+            if (!AppConstant.MAC_ADDRESS.equals("")) {//保证蓝牙已经连接
                 mPresenter.getRulerNumDataRequest();//初始化返回当前尺子可用的编码（每次会加1）
                 if (isGetRulerNum && !result.equals("")) {//确保蓝牙编号存在
                     String checkCode1 = result.substring(0, 2);//注意substring是不包括结尾的索引的
@@ -435,20 +445,20 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
                     //把二个十六进制转化成long相加 来获取校验码
                     long x = Long.parseLong(checkCode1, 16);
                     long y = Long.parseLong(checkCode2, 16);
-                    String checkCodeResult = Long.toHexString(x+y);
-                    LogUtils.loge(checkCode1+"==="+checkCode2+"==="+checkCodeResult);
+                    String checkCodeResult = Long.toHexString(x + y);
+                    LogUtils.loge(checkCode1 + "===" + checkCode2 + "===" + checkCodeResult);
                     if (checkCodeResult.length() > 2) {//确保校验码长度小于2
                         ToastUtil.showShort("校验码长度过长,写入失败");
                         mPresenter.getRulerNumDataRequest();
                         return;
                     }
                     String instructions = "A0" + result + checkCodeResult;//最终发送的指令 A0这个帧头是固定的
-                    LogUtils.loge("instructions=="+instructions);
+                    LogUtils.loge("instructions==" + instructions);
 
                     CompositeDisposable disposable = new CompositeDisposable();
                     PublishSubject<Boolean> disconnectTriggerSubject = PublishSubject.create();
                     byte[] bytes = HexStringTwo.hexStringToBytes(instructions);//一个字节可表示为两个十六进制数字  A0 00 01 01
-                    LogUtils.loge("length: "+bytes.length);
+                    LogUtils.loge("length: " + bytes.length);
 
                     writeBleName(bytes);
 //                    byte[] bytes1 = Arrays.copyOfRange(bytes, 0, 1);
@@ -501,11 +511,11 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
 //                            .compose(RxSchedulers.io_main())
 //                            .subscribe(disposableObserver);
 //                    disposable.add(disposableObserver);
-                }else {
+                } else {
                     ToastUtil.showShort("蓝牙编号获取失败，请重试");
                 }
 
-            }else {
+            } else {
                 ToastUtil.showShort("当前UUID已为空，先连接智能尺");
             }
 
@@ -514,7 +524,7 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
         disconnect_ble.setOnClickListener(v -> {
             if (scanResultList.size() > 0) {
                 if (BleManager.getInstance().isConnected(scanResultList.get(connectPostion))) {
-                BleManager.getInstance().disconnect(scanResultList.get(connectPostion));
+                    BleManager.getInstance().disconnect(scanResultList.get(connectPostion));
                 }
             }
         });
@@ -551,12 +561,12 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
                     remuasure = true;
                     qualityBleDataList.get(itemPostionAgo).setSelected(false);
                     if (unMeasuredCounts != 0) {
-                        qualityBleDataList.get(measuredCounts-unMeasuredCounts).setSelected(false);
+                        qualityBleDataList.get(measuredCounts - unMeasuredCounts).setSelected(false);
                     }
                     qualityBleDataList.get(itemPostion).setSelected(true);
                     adapter.notifyDataSetChanged();
                     itemPostionAgo = itemPostion;
-                }else {
+                } else {
                     ToastUtil.showShort("请先按顺序完成第一次测量");
                 }
 
@@ -593,7 +603,7 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
                 if (qualityBleData.isUnqualified()) {
                     //不及格的
                     actValue.setTextColor(getResources().getColor(R.color.battery_color));
-                }else {
+                } else {
                     actValue.setTextColor(getResources().getColor(R.color.black));
                 }
 
@@ -604,9 +614,9 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
                     helper.setBackgroundColor(R.id.actAngle, getResources().getColor(R.color.item_selector));
                 } else {
                     //未选中的样式
-                    helper.setBackgroundColor(R.id.valueLength,getResources().getColor(R.color.white));
-                    helper.setBackgroundColor(R.id.actValue,getResources().getColor(R.color.white));
-                    helper.setBackgroundColor(R.id.actAngle,getResources().getColor(R.color.white));
+                    helper.setBackgroundColor(R.id.valueLength, getResources().getColor(R.color.white));
+                    helper.setBackgroundColor(R.id.actValue, getResources().getColor(R.color.white));
+                    helper.setBackgroundColor(R.id.actAngle, getResources().getColor(R.color.white));
                 }
 
                 if (qualityBleData.getActValue() == 0) {
@@ -622,7 +632,7 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
                         @Override
                         public void onClick(@NonNull MaterialDialog dialog, @NonNull DialogAction which) {
                             qualityBleDataList.clear();
-                            for (int i=0;i<qualityValueLengths.size();i++) {
+                            for (int i = 0; i < qualityValueLengths.size(); i++) {
                                 qualityBleDataList.add(new QualityBleData());
                                 qualityBleDataList.get(i).setValueLength(qualityValueLengths.get(i).getValueLength());
                             }
@@ -640,13 +650,13 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
 
         });
         view.findViewById(R.id.btnSave).setOnClickListener(v -> {
-            if (customer.getEditableText().toString().trim().length()>=1) {
-                if (unMeasuredCounts == 0 && AppConstant.MAC_ADDRESS!="") {
-                    mPresenter.getUpLoadAfterCheckedRequest(customer.getEditableText().toString().trim(),AppConstant.MAC_ADDRESS);
-                }else {
+            if (customer.getEditableText().toString().trim().length() >= 1) {
+                if (unMeasuredCounts == 0 && AppConstant.MAC_ADDRESS != "") {
+                    mPresenter.getUpLoadAfterCheckedRequest(customer.getEditableText().toString().trim(), AppConstant.MAC_ADDRESS);
+                } else {
                     ToastUtil.showShort("请先测量完毕！");
                 }
-            }else {
+            } else {
                 ToastUtil.showShort("您还没有填写对应的客户呐！");
             }
 
@@ -654,7 +664,7 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
         irc.addFooterView(view);
 
         irc.setAdapter(adapter);
-        irc.setLayoutManager(new StaggeredGridLayoutManager(1,StaggeredGridLayoutManager.VERTICAL));
+        irc.setLayoutManager(new StaggeredGridLayoutManager(1, StaggeredGridLayoutManager.VERTICAL));
     }
 
     //获取需要测试的长度
@@ -662,7 +672,7 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
     public void returnGetQualityData(List<QualityValueLength> qualityValueLength) {
         if (qualityValueLength != null) {
             qualityValueLengths = qualityValueLength;
-            for (int i=0;i<qualityValueLength.size();i++) {
+            for (int i = 0; i < qualityValueLength.size(); i++) {
                 qualityBleDataList.add(new QualityBleData());
                 qualityBleDataList.get(i).setValueLength(qualityValueLength.get(i).getValueLength());
             }
@@ -712,21 +722,22 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
 //            }
 //        }
         //蓝牙第二版（可写--改名）通过FastBle查看到特性的值
-            for (BluetoothGattCharacteristic characteristic : deviceServices.getBluetoothGattServices().get(3).getCharacteristics()) {
-                if ((characteristic.getProperties() & BluetoothGattCharacteristic.PROPERTY_WRITE) != 0) {
-                    // TODO: 2019/1/10 0010 不同蓝牙的服务和特性都是一样的通过FastBLE直接固定传入，不获取了
-                }
-                if (isCharacteristicNotifiable(characteristic)) {
-                    ToastUtil.showShort("蓝牙配对成功，等待建立通信中...");
-                    cirProgressBarWithChoose.dismiss();
-                    mPresenter.startMeasureRequest(characteristic.getUuid());
-                    if (AppConstant.MAC_ADDRESS!="") {
-                        mPresenter.checkBleConnectStateRequest(AppConstant.MAC_ADDRESS);
-                    }
-                    break;
-                }
+        for (BluetoothGattCharacteristic characteristic : deviceServices.getBluetoothGattServices().get(3).getCharacteristics()) {
+            if ((characteristic.getProperties() & BluetoothGattCharacteristic.PROPERTY_WRITE) != 0) {
+                // TODO: 2019/1/10 0010 不同蓝牙的服务和特性都是一样的通过FastBLE直接固定传入，不获取了
             }
+            if (isCharacteristicNotifiable(characteristic)) {
+                ToastUtil.showShort("蓝牙配对成功，等待建立通信中...");
+                cirProgressBarWithChoose.dismiss();
+                mPresenter.startMeasureRequest(characteristic.getUuid());
+                if (AppConstant.MAC_ADDRESS != "") {
+                    mPresenter.checkBleConnectStateRequest(AppConstant.MAC_ADDRESS);
+                }
+                break;
+            }
+        }
     }
+
     private boolean isCharacteristicNotifiable(BluetoothGattCharacteristic characteristic) {
         return (characteristic.getProperties() & BluetoothGattCharacteristic.PROPERTY_NOTIFY) != 0;
     }
@@ -766,12 +777,12 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
         for (int i = 0; i < qualityBleDataList.size(); i++) {
             if (qualityBleDataList.get(i).getActValue() - Float.valueOf(qualityBleDataList.get(i).getValueLength()) > 0.3 || qualityBleDataList.get(i).getActValue() - Float.valueOf(qualityBleDataList.get(i).getValueLength()) < -0.3) {
                 unqualifiedData.add(i);
-            }else {
+            } else {
                 qualityBleDataList.get(i).setUnqualified(false);
             }
         }
 
-        for (Integer i:unqualifiedData) {
+        for (Integer i : unqualifiedData) {
             qualityBleDataList.get(i).setUnqualified(true);
             adapter.notifyDataSetChanged();
         }
@@ -780,12 +791,12 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
     private void assignValue(Float length, Float angle) {
         try {
             if (unMeasuredCounts != 1) {//这个操作只有蓝牙按下后才会触发，所以unMeasuredCounts不能为1
-                qualityBleDataList.get(measuredCounts+1-unMeasuredCounts).setSelected(true);
+                qualityBleDataList.get(measuredCounts + 1 - unMeasuredCounts).setSelected(true);
             }
-            qualityBleDataList.get(measuredCounts-unMeasuredCounts).setSelected(false);
+            qualityBleDataList.get(measuredCounts - unMeasuredCounts).setSelected(false);
             qualityBleDataList.get(measuredCounts - unMeasuredCounts).setActValue(length);
             qualityBleDataList.get(measuredCounts - unMeasuredCounts).setActAngle(angle);
-            canRemeasureData.add(measuredCounts-unMeasuredCounts);
+            canRemeasureData.add(measuredCounts - unMeasuredCounts);
             if (unMeasuredCounts != 0) {
                 unMeasuredCounts = unMeasuredCounts - 1;
             }
@@ -798,7 +809,7 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
 
     //监听蓝牙状态
     @Override
-    public void returnCheckBleConnectState(RxBleConnection.RxBleConnectionState connectionState,String mac) {
+    public void returnCheckBleConnectState(RxBleConnection.RxBleConnectionState connectionState, String mac) {
         RxBleClient rxBleClient = AppApplication.getRxBleClient(this);
 
         RxBleDevice rxBleDevice = rxBleClient.getBleDevice(mac);
@@ -816,12 +827,12 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
 
     //上传服务器返回
     @Override
-    public void returnGetUpLoadAfterChecked(HttpResponse httpResponse){
-        if (httpResponse.getSuccess()){
+    public void returnGetUpLoadAfterChecked(HttpResponse httpResponse) {
+        if (httpResponse.getSuccess()) {
             //设置录入总数
             try {
                 JSONObject jsonObject = new JSONObject(httpResponse.getData().toString());
-                LogUtils.loge("录入总数"+jsonObject.getString("count"));
+                LogUtils.loge("录入总数" + jsonObject.getString("count"));
                 float f = Float.parseFloat(jsonObject.getString("count"));
                 int i = (int) f;
                 macCounts.setText(String.valueOf(i));
@@ -831,7 +842,7 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
 
             ToastUtil.showShort(httpResponse.getMsg());
             qualityBleDataList.clear();
-            for (int i=0;i<qualityValueLengths.size();i++) {
+            for (int i = 0; i < qualityValueLengths.size(); i++) {
                 qualityBleDataList.add(new QualityBleData());
                 qualityBleDataList.get(i).setValueLength(qualityValueLengths.get(i).getValueLength());
             }
@@ -840,7 +851,7 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
             qualityBleDataList.get(0).setSelected(true);
             adapter.notifyDataSetChanged();
             customer.setText("");
-        }else {
+        } else {
             ToastUtil.showShort("该mac已经存在，不可重复添加");
         }
     }
@@ -853,11 +864,11 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
             try {
                 String s = JSON.toJSONString(fuzzySearchData.getData());
                 JSONArray jsonArray = new JSONArray(s);
-                LogUtils.loge("jsonArray==="+jsonArray);
-                for (int i=0; i<jsonArray.length();i++) {
-                    JSONObject ob  = jsonArray.getJSONObject(i);
-                    String name= ob.getString("name");
-                    LogUtils.loge("name==" +name);
+                LogUtils.loge("jsonArray===" + jsonArray);
+                for (int i = 0; i < jsonArray.length(); i++) {
+                    JSONObject ob = jsonArray.getJSONObject(i);
+                    String name = ob.getString("name");
+                    LogUtils.loge("name==" + name);
                     searchName.add(name);
                 }
             } catch (JSONException e) {
@@ -874,17 +885,17 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
     @Override
     public void returnRulerNumData(Integer data) {//65535转化的十六进制是ffff,再大就会超过4位数
         isGetRulerNum = true;
-        LogUtils.loge("ruler_num"+data);
+        LogUtils.loge("ruler_num" + data);
         String strHex = Integer.toHexString(data);//将其转换为十六进制
-        LogUtils.loge("ruler_num_hex"+strHex);
+        LogUtils.loge("ruler_num_hex" + strHex);
         if (strHex.length() < 5) {
             strHex = String.format("%4s", Integer.toHexString(data)).replace(' ', '0');//确保位4位数
             result = strHex;
-        }else {
+        } else {
             ToastUtil.showShort("服务器编号转化的字节长度过长,请删除数据库的编号重新开始");
             result = "";
         }
-        LogUtils.loge("ruler_num_result"+result);
+        LogUtils.loge("ruler_num_result" + result);
     }
 
     private void showPopupWindow() {
@@ -901,7 +912,7 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter,Quality
 
     @Override
     public void showLoading(String title) {
-        if (title=="chooseConnect") {
+        if (title == "chooseConnect") {
             cirProgressBarWithChoose.show();
         }
     }
