@@ -224,7 +224,8 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter, Qualit
                                             public void onCharacteristicChanged(byte[] data) {
                                                 // 打开通知后，设备发过来的数据将在这里出现
                                                 String s = HexString.bytesToHex(data);
-                                                if (s.length() == AppConstant.STANDARD_LENGTH) {
+                                                LogUtils.loge("STANDARD_LENGTH--"+s.length());
+                                                if (s.length() == AppConstant.STANDARD_LENGTH && scanResultList.get(connectPostion).getName().length()==10) {//旧蓝牙（新旧蓝牙的解码方式不一样）
                                                     int code = Integer.parseInt("8D6A", 16);
                                                     int length = Integer.parseInt(s.substring(0, 4), 16);
                                                     int angle = Integer.parseInt(s.substring(4, 8), 16);
@@ -232,6 +233,16 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter, Qualit
                                                     int a1 = length ^ code;
                                                     int a2 = angle ^ code;
                                                     int a3 = battery ^ code;
+                                                    a1 += AppConstant.ADJUST_VALUE;
+                                                    returnStartMeasure(Float.valueOf(a1) / 10, Float.valueOf(a2) / 10, a3);
+                                                }else if (s.length() == AppConstant.STANDARD_LENGTH && scanResultList.get(connectPostion).getName().length()>10){
+                                                    int code = Integer.parseInt("8D61", 16);
+                                                    int length = Integer.parseInt(s.substring(0, 4), 16);
+                                                    int angle = Integer.parseInt(s.substring(4, 8), 16);
+                                                    int battery = Integer.parseInt(s.substring(8, 12), 16);
+                                                    int a1 = length ^ code;
+                                                    int a2 = angle ^ code;
+                                                    int a3 = battery ^ Integer.parseInt("8D60", 16);
                                                     a1 += AppConstant.ADJUST_VALUE;
                                                     returnStartMeasure(Float.valueOf(a1) / 10, Float.valueOf(a2) / 10, a3);
                                                 }
