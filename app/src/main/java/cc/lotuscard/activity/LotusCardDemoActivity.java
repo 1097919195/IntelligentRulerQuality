@@ -134,6 +134,7 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter, Qualit
     String result = "";//格式化尺子编号
     boolean isGetRulerNum = false;
     boolean isFirstScanAdd = true;
+    boolean isConnected = false;
     int connectPostion = -1;
 
     @Override
@@ -146,7 +147,12 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter, Qualit
 
     private void initBleStateListener() {
         bleState.setOnClickListener(v -> {
-            scanAndConnectBle();
+            if (!isConnected) {
+                scanAndConnectBle();
+            }else {
+                ToastUtil.showShort("请先断开连接");
+            }
+
         });
     }
 
@@ -179,6 +185,7 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter, Qualit
                         connectPostion = helper.getAdapterPosition();//记录索引等下获取对应的BleDevice
                         LogUtils.loge("connectPostion==" + connectPostion);
                         BleManager.getInstance().cancelScan();//停止扫描
+                        isConnected = false;//确保建立连接使不可点击
                         BleManager.getInstance().connect(text_mac.getText().toString(), new BleGattCallback() {
                             @Override
                             public void onStartConnect() {
@@ -197,61 +204,18 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter, Qualit
 
                             @Override
                             public void onConnectSuccess(BleDevice bleDevice, BluetoothGatt gatt, int status) {
+                                isConnected = true;
                                 AppConstant.MAC_ADDRESS = bleDevice.getMac();
                                 bleState.setImageResource(R.drawable.ble_connected);
                                 bleMacAddress.setText(AppConstant.MAC_ADDRESS);
                                 cirProgressBarWithChoose.dismiss();
                                 ToastUtil.showShort("连接成功");
-                                BleManager.getInstance().notify(//连接后 获取通知特性
-                                        bleDevice,
-                                        AppConstant.UUID_SERVER,
-                                        AppConstant.UUID_STRING,
-                                        new BleNotifyCallback() {
-                                            @Override
-                                            public void onNotifySuccess() {
-                                                ToastUtil.showShort("通知连接成功");
-                                                // 打开通知操作成功
-                                            }
-
-                                            @Override
-                                            public void onNotifyFailure(BleException exception) {
-                                                bleMacAddress.setText("");
-                                                ToastUtil.showShort("通知连接失败");
-                                                // 打开通知操作失败
-                                            }
-
-                                            @Override
-                                            public void onCharacteristicChanged(byte[] data) {
-                                                // 打开通知后，设备发过来的数据将在这里出现
-                                                String s = HexString.bytesToHex(data);
-                                                LogUtils.loge("STANDARD_LENGTH--"+s.length());
-                                                if (s.length() == AppConstant.STANDARD_LENGTH && scanResultList.get(connectPostion).getName().length()==10) {//旧蓝牙（新旧蓝牙的解码方式不一样）
-                                                    int code = Integer.parseInt("8D6A", 16);
-                                                    int length = Integer.parseInt(s.substring(0, 4), 16);
-                                                    int angle = Integer.parseInt(s.substring(4, 8), 16);
-                                                    int battery = Integer.parseInt(s.substring(8, 12), 16);
-                                                    int a1 = length ^ code;
-                                                    int a2 = angle ^ code;
-                                                    int a3 = battery ^ code;
-                                                    a1 += AppConstant.ADJUST_VALUE;
-                                                    returnStartMeasure(Float.valueOf(a1) / 10, Float.valueOf(a2) / 10, a3);
-                                                }else if (s.length() == AppConstant.STANDARD_LENGTH && scanResultList.get(connectPostion).getName().length()>10){
-                                                    int code = Integer.parseInt("8D61", 16);
-                                                    int length = Integer.parseInt(s.substring(0, 4), 16);
-                                                    int angle = Integer.parseInt(s.substring(4, 8), 16);
-                                                    int battery = Integer.parseInt(s.substring(8, 12), 16);
-                                                    int a1 = length ^ code;
-                                                    int a2 = angle ^ code;
-                                                    int a3 = battery ^ Integer.parseInt("8D60", 16);
-                                                    a1 += AppConstant.ADJUST_VALUE;
-                                                    returnStartMeasure(Float.valueOf(a1) / 10, Float.valueOf(a2) / 10, a3);
-                                                }
-                                            }
-                                        });
+                                notifyBle(bleDevice);//成功后建立蓝牙通信
                             }
 
                             @Override
                             public void onDisConnected(boolean isActiveDisConnected, BleDevice bleDevice, BluetoothGatt gatt, int status) {
+                                isConnected = false;
                                 bleState.setImageResource(R.drawable.ble_disconnected);
                                 cirProgressBarWithChoose.dismiss();
                                 bleMacAddress.setText("");
@@ -559,6 +523,62 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter, Qualit
                     public void onWriteFailure(BleException exception) {
                         ToastUtil.showShort("写入失败，请重试");
                         // 发送数据到设备失败
+                    }
+                });
+    }
+
+
+    private void notifyBle(BleDevice bleDevice){
+        BleManager.getInstance().notify(//连接后 获取通知特性
+                bleDevice,
+                AppConstant.UUID_SERVER,
+                AppConstant.UUID_STRING,
+                new BleNotifyCallback() {
+                    @Override
+                    public void onNotifySuccess() {
+                        ToastUtil.showShort("通知连接成功");
+                        // 打开通知操作成功
+                    }
+
+                    @Override
+                    public void onNotifyFailure(BleException exception) {
+                        isConnected = false;
+                        bleState.setImageResource(R.drawable.ble_disconnected);
+                        cirProgressBarWithChoose.dismiss();
+                        bleMacAddress.setText("");
+                        ToastUtil.showShort("蓝牙连接断开");
+                        AppConstant.MAC_ADDRESS = "";
+                        bleBattery.setText("");
+                        ToastUtil.showShort("通知连接失败，请重新建立连接");
+                        // 打开通知操作失败
+                    }
+
+                    @Override
+                    public void onCharacteristicChanged(byte[] data) {
+                        // 打开通知后，设备发过来的数据将在这里出现
+                        String s = HexString.bytesToHex(data);
+                        LogUtils.loge("STANDARD_LENGTH--"+s.length());
+                        if (s.length() == AppConstant.STANDARD_LENGTH && scanResultList.get(connectPostion).getName().length()==10) {//旧蓝牙（新旧蓝牙的解码方式不一样）
+                            int code = Integer.parseInt("8D6A", 16);
+                            int length = Integer.parseInt(s.substring(0, 4), 16);
+                            int angle = Integer.parseInt(s.substring(4, 8), 16);
+                            int battery = Integer.parseInt(s.substring(8, 12), 16);
+                            int a1 = length ^ code;
+                            int a2 = angle ^ code;
+                            int a3 = battery ^ code;
+                            a1 += AppConstant.ADJUST_VALUE;
+                            returnStartMeasure(Float.valueOf(a1) / 10, Float.valueOf(a2) / 10, a3);
+                        }else if (s.length() == AppConstant.STANDARD_LENGTH && scanResultList.get(connectPostion).getName().length()>10){
+                            int code = Integer.parseInt("8D61", 16);
+                            int length = Integer.parseInt(s.substring(0, 4), 16);
+                            int angle = Integer.parseInt(s.substring(4, 8), 16);
+                            int battery = Integer.parseInt(s.substring(8, 12), 16);
+                            int a1 = length ^ code;
+                            int a2 = angle ^ code;
+                            int a3 = battery ^ Integer.parseInt("8D60", 16);
+                            a1 += AppConstant.ADJUST_VALUE;
+                            returnStartMeasure(Float.valueOf(a1) / 10, Float.valueOf(a2) / 10, a3);
+                        }
                     }
                 });
     }
