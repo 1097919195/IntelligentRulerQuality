@@ -427,11 +427,13 @@ public class LotusCardDemoActivity extends BaseActivity<QualityPresenter, Qualit
                         ToastUtil.showShort("校验码长度过长,写入失败");
                         mPresenter.getRulerNumDataRequest();
                         return;
-                    } else if (checkCodeResult.length() < 2) {
-                        checkCodeResultFinal = String.format("%2s", Long.parseLong(checkCodeResult, 16)).replace(' ', '0');//保证为2位数，不过小于二位好像不格式化也可以
-                        LogUtils.loge(checkCodeResultFinal);
-                    }
+                    } else if (checkCodeResult.length() < 2) {//小于二位补零
+                        checkCodeResultFinal = String.format("%2s", checkCodeResult).replace(' ', '0');//保证为2位数，不过小于二位好像不格式化也可以
 
+                    }else {
+                        checkCodeResultFinal = checkCodeResult;
+                    }
+                    LogUtils.loge(checkCodeResultFinal);
                     LogUtils.loge(checkCode1 + "===" + checkCode2 + "===" + checkCodeResultFinal);
                     String instructions = "A0" + result + checkCodeResultFinal;//最终发送的指令 A0这个帧头是固定的
                     LogUtils.loge("instructions==" + instructions);
